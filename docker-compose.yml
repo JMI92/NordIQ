@@ -1,0 +1,51 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nordiq
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: nordiq
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nordiq"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://nordiq:password@db:5432/nordiq
+      SYNC_DATABASE_URL: postgresql://nordiq:password@db:5432/nordiq
+      SECRET_KEY: ${SECRET_KEY:-change-this-in-production}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      APP_ENV: ${APP_ENV:-development}
+    ports:
+      - "8000:8000"
+    volumes:
+      - reports_data:/app/reports
+
+  frontend:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      API_URL: http://api:8000
+    command: streamlit run nordiq/frontend/app.py --server.port 8501 --server.address 0.0.0.0
+    ports:
+      - "8501:8501"
+
+volumes:
+  postgres_data:
+  reports_data:
