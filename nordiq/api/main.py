@@ -13,7 +13,6 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
     ok = await check_db_connection()
     if not ok:
         raise RuntimeError("Database connection failed on startup")
@@ -24,7 +23,6 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Shutdown
     from nordiq.scheduler.jobs import shutdown_scheduler  # noqa: F811
     shutdown_scheduler()
 
@@ -47,10 +45,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-# ---------------------------------------------------------------------------
-# Routers
-# ---------------------------------------------------------------------------
 from nordiq.api.routers import auth, customers, data_sources, products, calculations, submissions, audit  # noqa: E402
 
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
