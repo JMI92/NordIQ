@@ -34,10 +34,6 @@ router = APIRouter()
 REPORT_OUTPUT_DIR = os.getenv("REPORT_OUTPUT_DIR", "/tmp/nordiq_reports")
 
 
-# ---------------------------------------------------------------------------
-# Schemas
-# ---------------------------------------------------------------------------
-
 class SubmitRequest(BaseModel):
     obligation_id: uuid.UUID
     submission_method: SubmissionMethod
@@ -59,10 +55,6 @@ class SubmissionResponse(BaseModel):
         from_attributes = True
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 def _to_response(sub: PROSubmission) -> SubmissionResponse:
     return SubmissionResponse(
         id=sub.id,
@@ -78,11 +70,7 @@ def _to_response(sub: PROSubmission) -> SubmissionResponse:
     )
 
 
-async def _get_owned_obligation(
-    obligation_id: uuid.UUID,
-    customer_id: uuid.UUID,
-    db: AsyncSession,
-) -> EPRObligation:
+async def _get_owned_obligation(obligation_id, customer_id, db):
     result = await db.execute(
         select(EPRObligation).where(
             EPRObligation.id == obligation_id,
@@ -96,12 +84,9 @@ async def _get_owned_obligation(
 
 
 def _build_calc_obligation(ob: EPRObligation) -> CalcObligation:
-    """Reconstruct a CalcObligation from the DB model for report generation."""
     from decimal import Decimal
-
     snap = ob.calculation_snapshot or {}
     wbm = {m: Decimal(w) for m, w in snap.get("weight_by_material_kg", {}).items()}
-
     return CalcObligation(
         country_code=ob.country_code,
         pro_id=ob.pro_id,
@@ -118,20 +103,13 @@ def _build_calc_obligation(ob: EPRObligation) -> CalcObligation:
     )
 
 
-# ---------------------------------------------------------------------------
-# Endpoints
-# ---------------------------------------------------------------------------
-
 @router.get("", response_model=list[SubmissionResponse])
 async def list_submissions(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     obligation_id: uuid.UUID | None = Query(default=None),
 ):
-    """List all submission attempts for the authenticated customer."""
-    stmt = select(PROSubmission).where(
-        PROSubmission.customer_id == current_user.customer_id
-    )
+    stmt = select(PROSubmission).where(PROSubmission.customer_id == current_user.customer_id)
     if obligation_id is not None:
         stmt = stmt.where(PROSubmission.obligation_id == obligation_id)
     stmt = stmt.order_by(PROSubmission.created_at.desc())
@@ -147,20 +125,16 @@ async def submit_obligation(
 ):
     """Generate the report file and record a submission attempt.
 
-    - Obligation must be in FINALISED status.
-    - Each call creates a new PROSubmission row (idempotent retry pattern).
-    - portal: generates CSV and sets status=PENDING; user downloads and uploads manually.
-    - api: generates CSV then calls the PRO connector; status=SUCCESS or FAILED.
+    Obligation must be FINALISED. Each call creates a new PROSubmission row
+    (idempotent retry pattern). portal stays PENDING; api calls the connector.
     """
     ob = await _get_owned_obligation(body.obligation_id, current_user.customer_id, db)
-
     if ob.status != ObligationStatus.FINALISED:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Obligation must be FINALISED before submitting (current: {ob.status})",
         )
 
-    # Count previous attempts for retry_count
     count_result = await db.execute(
         select(PROSubmission).where(
             PROSubmission.obligation_id == ob.id,
@@ -169,12 +143,10 @@ async def submit_obligation(
     )
     prior_attempts = len(count_result.scalars().all())
 
-    # Generate report file
     calc_ob = _build_calc_obligation(ob)
     generator = NordicReportGenerator(REPORT_OUTPUT_DIR)
     report_file = generator.generate(calc_ob)
 
-    # Create submission record (PENDING initially)
     sub = PROSubmission(
         customer_id=current_user.customer_id,
         obligation_id=ob.id,
@@ -185,10 +157,9 @@ async def submit_obligation(
         retry_count=prior_attempts,
     )
     db.add(sub)
-    await db.flush()  # get the id before committing
+    await db.flush()
 
     if body.submission_method == SubmissionMethod.API:
-        # Attempt API submission via connector
         connector = NordicPROConnector()
         result = connector.submit_report(report_file, calc_ob)
         sub.response_payload = result.response_payload
@@ -199,7 +170,6 @@ async def submit_obligation(
         else:
             sub.status = SubmissionStatus.FAILED
             sub.error_message = result.error_message
-    # portal: stay PENDING until user acknowledges
 
     await db.commit()
     await db.refresh(sub)
@@ -242,17 +212,11 @@ async def download_report(
         raise HTTPException(status_code=404, detail="Submission not found")
     if not sub.report_file_path:
         raise HTTPException(status_code=404, detail="No report file for this submission")
-
     import os as _os
     if not _os.path.isfile(sub.report_file_path):
         raise HTTPException(status_code=404, detail="Report file not found on disk")
-
     filename = _os.path.basename(sub.report_file_path)
-    return FileResponse(
-        path=sub.report_file_path,
-        media_type="text/csv",
-        filename=filename,
-    )
+    return FileResponse(path=sub.report_file_path, media_type="text/csv", filename=filename)
 
 
 @router.post("/{submission_id}/acknowledge", response_model=SubmissionResponse)
@@ -261,7 +225,7 @@ async def acknowledge_submission(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """Mark a PENDING portal submission as ACKNOWLEDGED (user has uploaded to PRO portal)."""
+    """Mark a PENDING portal submission as ACKNOWLEDGED."""
     result = await db.execute(
         select(PROSubmission).where(
             PROSubmission.id == submission_id,
@@ -276,10 +240,7 @@ async def acknowledge_submission(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Only PENDING submissions can be acknowledged (current: {sub.status})",
         )
-
     sub.status = SubmissionStatus.ACKNOWLEDGED
-
-    # Also transition the obligation to SUBMITTED
     ob_result = await db.execute(
         select(EPRObligation).where(
             EPRObligation.id == sub.obligation_id,
@@ -290,7 +251,6 @@ async def acknowledge_submission(
     if ob and ob.status == ObligationStatus.FINALISED:
         ob.submitted_at = datetime.now(timezone.utc)
         ob.status = ObligationStatus.SUBMITTED
-
     await db.commit()
     await db.refresh(sub)
     return _to_response(sub)
