@@ -130,3 +130,54 @@ def upload_products_csv(file_bytes: bytes, filename: str) -> dict:
         timeout=60,
     )
     return _handle(resp)
+
+
+# ---------------------------------------------------------------------------
+# Calculations
+# ---------------------------------------------------------------------------
+
+def run_calculation(
+    country_code: str,
+    product_category: str,
+    period_start: str,
+    period_end: str,
+) -> dict | None:
+    resp = requests.post(
+        f"{_base_url()}/api/v1/calculations",
+        json={
+            "country_code": country_code,
+            "product_category": product_category,
+            "period_start": period_start,
+            "period_end": period_end,
+        },
+        headers=_headers(),
+        timeout=30,
+    )
+    return _handle(resp)
+
+
+def list_obligations() -> list[dict]:
+    resp = requests.get(
+        f"{_base_url()}/api/v1/calculations",
+        headers=_headers(),
+        timeout=10,
+    )
+    return _handle(resp)
+
+
+def finalise_obligation(obligation_id: str) -> dict:
+    resp = requests.post(
+        f"{_base_url()}/api/v1/calculations/{obligation_id}/finalise",
+        headers=_headers(),
+        timeout=10,
+    )
+    return _handle(resp)
+
+
+def delete_obligation(obligation_id: str) -> None:
+    resp = requests.delete(
+        f"{_base_url()}/api/v1/calculations/{obligation_id}",
+        headers=_headers(),
+        timeout=10,
+    )
+    _handle(resp)
