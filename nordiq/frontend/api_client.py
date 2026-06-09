@@ -181,3 +181,50 @@ def delete_obligation(obligation_id: str) -> None:
         timeout=10,
     )
     _handle(resp)
+
+
+# ---------------------------------------------------------------------------
+# Submissions
+# ---------------------------------------------------------------------------
+
+def submit_obligation(obligation_id: str, submission_method: str) -> dict | None:
+    resp = requests.post(
+        f"{_base_url()}/api/v1/submissions",
+        json={"obligation_id": obligation_id, "submission_method": submission_method},
+        headers=_headers(),
+        timeout=30,
+    )
+    return _handle(resp)
+
+
+def list_submissions(obligation_id: str | None = None) -> list[dict]:
+    params = {}
+    if obligation_id:
+        params["obligation_id"] = obligation_id
+    resp = requests.get(
+        f"{_base_url()}/api/v1/submissions",
+        headers=_headers(),
+        params=params,
+        timeout=10,
+    )
+    return _handle(resp)
+
+
+def acknowledge_submission(submission_id: str) -> dict:
+    resp = requests.post(
+        f"{_base_url()}/api/v1/submissions/{submission_id}/acknowledge",
+        headers=_headers(),
+        timeout=10,
+    )
+    return _handle(resp)
+
+
+def download_submission_report(submission_id: str) -> bytes | None:
+    resp = requests.get(
+        f"{_base_url()}/api/v1/submissions/{submission_id}/download",
+        headers=_headers(),
+        timeout=30,
+    )
+    if not resp.ok:
+        return None
+    return resp.content
