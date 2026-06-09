@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import date
-
 import streamlit as st
 
 from nordiq.frontend import api_client
