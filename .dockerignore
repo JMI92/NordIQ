@@ -1,0 +1,40 @@
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Local environment
+.env
+.env.local
+*.env
+
+# Reports / generated files
+reports/
+/tmp/
+
+# Tests
+.coverage
+htmlcov/
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Docker
+docker-compose.override.yml
+
+# Node (if ever added)
+node_modules/
