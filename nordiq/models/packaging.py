@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import Boolean, Column, Date, Numeric, String
+from sqlalchemy import Boolean, Column, Date, ForeignKey, Numeric, String
 from sqlalchemy.dialects.postgresql import UUID
 
 from nordiq.core.database import Base
