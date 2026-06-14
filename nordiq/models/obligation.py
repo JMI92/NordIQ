@@ -86,6 +86,13 @@ class EPRRate(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     valid_to: Mapped[date | None] = mapped_column(Date, nullable=True)
     regulation_reference: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
+    # EPR structural extensions (PPWR / eco-modulation / SUP)
+    fixed_annual_fee_eur = mapped_column(Numeric(18, 4), nullable=True)
+    eco_modulation_factor = mapped_column(Numeric(8, 4), nullable=False, server_default="1.0000")
+    packaging_stream = mapped_column(String(20), nullable=True)
+    is_sup_surcharge = mapped_column(Boolean, nullable=False, server_default="false")
+    ppwr_effective_from = mapped_column(Date, nullable=True)
+
     def __repr__(self) -> str:
         return f"<EPRRate {self.country_code} {self.material_type} {self.rate_per_kg}/kg from {self.valid_from}>"
 

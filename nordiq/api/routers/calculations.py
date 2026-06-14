@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from nordiq.api.dependencies import get_current_user
 from nordiq.calculators.base import ReportingPeriod
-from nordiq.calculators.nordic.packaging import RateSet
+from nordiq.calculators.nordic.packaging import RateEntry, RateSet
 from nordiq.calculators.registry import get_calculator_class
 from nordiq.core.database import get_db
 from nordiq.ingestion.base import NormalizedProductData
@@ -104,7 +104,19 @@ async def _load_rate_set(
 
     # All rates for the same country/category share the same currency
     sample = next(iter(active.values()))
-    rates = {mt: Decimal(str(r.rate_per_kg)) for mt, r in active.items()}
+    rates = {
+        mt: RateEntry(
+            rate_per_kg=Decimal(str(r.rate_per_kg)),
+            eco_modulation_factor=Decimal(str(r.eco_modulation_factor)) if r.eco_modulation_factor is not None else Decimal("1.0"),
+            is_sup_surcharge=bool(r.is_sup_surcharge) if r.is_sup_surcharge is not None else False,
+            packaging_stream=r.packaging_stream,
+        )
+        for mt, r in active.items()
+    }
+    fixed_annual_fee = max(
+        (Decimal(str(r.fixed_annual_fee_eur)) for r in active.values() if r.fixed_annual_fee_eur is not None),
+        default=Decimal("0"),
+    )
 
     return RateSet(
         country_code=country_code.upper(),
@@ -114,6 +126,7 @@ async def _load_rate_set(
         valid_from=min(r.valid_from for r in active.values()),
         valid_to=None,
         regulation_reference=sample.regulation_reference or "",
+        fixed_annual_fee_eur=fixed_annual_fee,
     )
 
 

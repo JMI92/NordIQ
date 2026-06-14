@@ -20,6 +20,17 @@ class MaterialType(str, enum.Enum):
     ELECTRONICS = "electronics"
     BATTERY = "battery"
     OTHER = "other"
+    RIGID_PLASTIC = "rigid_plastic"
+    FLEXIBLE_PLASTIC = "flexible_plastic"
+    SINGLE_USE_PLASTIC = "single_use_plastic"
+    BEVERAGE_CARTON = "beverage_carton"
+    COMPOSITE = "composite"
+
+
+class PackagingStream(str, enum.Enum):
+    HOUSEHOLD = "household"
+    COMMERCIAL = "commercial"
+    MIXED = "mixed"
 
 
 class DataSourceType(str, enum.Enum):

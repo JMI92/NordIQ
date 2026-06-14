@@ -15,7 +15,7 @@ All arithmetic uses Decimal — never float.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
@@ -24,17 +24,27 @@ from nordiq.ingestion.base import NormalizedProductData
 from nordiq.models.enums import MaterialType, ProductCategory
 
 
+@dataclass(frozen=True)
+class RateEntry:
+    """One rate row for a (material, stream) combination."""
+    rate_per_kg: Decimal
+    eco_modulation_factor: Decimal = Decimal("1.0")
+    is_sup_surcharge: bool = False
+    packaging_stream: str | None = None
+
+
 @dataclass
 class RateSet:
     """EPR rates for one country, one product category, one reporting period."""
     country_code: str
     product_category: ProductCategory
     currency: str
-    # material_type value (str) → rate per kg
-    rates: dict[str, Decimal]
+    # material_type value (str) → RateEntry
+    rates: dict[str, RateEntry]
     valid_from: date
     valid_to: date | None = None
     regulation_reference: str = ""
+    fixed_annual_fee_eur: Decimal = Decimal("0")
 
 
 class NordicPackagingCalculator(EPRCalculator):
@@ -50,12 +60,12 @@ class NordicPackagingCalculator(EPRCalculator):
             product_category=ProductCategory.PACKAGING,
             currency="EUR",
             rates={
-                "plastic": Decimal("0.45"),
-                "paper":   Decimal("0.08"),
-                "glass":   Decimal("0.06"),
-                "metal":   Decimal("0.12"),
-                "wood":    Decimal("0.04"),
-                "other":   Decimal("0.20"),
+                "plastic": RateEntry(rate_per_kg=Decimal("0.45")),
+                "paper":   RateEntry(rate_per_kg=Decimal("0.08")),
+                "glass":   RateEntry(rate_per_kg=Decimal("0.06")),
+                "metal":   RateEntry(rate_per_kg=Decimal("0.12")),
+                "wood":    RateEntry(rate_per_kg=Decimal("0.04")),
+                "other":   RateEntry(rate_per_kg=Decimal("0.20")),
             },
             valid_from=date(2024, 1, 1),
         )
@@ -77,7 +87,8 @@ class NordicPackagingCalculator(EPRCalculator):
         """Calculate the packaging EPR obligation for the given products and period.
 
         Only products whose reporting period overlaps with the given period are included.
-        Weight is aggregated per material, then multiplied by the corresponding rate.
+        Weight is aggregated per material, then multiplied by the corresponding rate
+        and eco_modulation_factor. fixed_annual_fee_eur is added to the total.
         """
         # Filter to products that fall within the reporting period
         in_scope = [
@@ -96,15 +107,21 @@ class NordicPackagingCalculator(EPRCalculator):
         # Calculate fee per material
         fee_by_material: dict[str, Decimal] = {}
         rates_used: dict[str, Decimal] = {}
+        eco_modulation_by_material: dict[str, str] = {}
 
         for material, weight in weight_by_material.items():
-            rate = self._resolve_rate(material)
-            fee = (weight * rate).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+            rate_entry = self._resolve_rate_entry(material)
+            fee = (weight * rate_entry.rate_per_kg * rate_entry.eco_modulation_factor).quantize(
+                Decimal("0.0001"), rounding=ROUND_HALF_UP
+            )
             fee_by_material[material] = fee
-            rates_used[material] = rate
+            rates_used[material] = rate_entry.rate_per_kg
+            eco_modulation_by_material[material] = str(rate_entry.eco_modulation_factor)
 
         total_weight = sum(weight_by_material.values(), Decimal(0))
-        total_fee = sum(fee_by_material.values(), Decimal(0)).quantize(
+        total_fee_variable = sum(fee_by_material.values(), Decimal(0))
+        fixed_fee = self._rate_set.fixed_annual_fee_eur
+        total_fee = (total_fee_variable + fixed_fee).quantize(
             Decimal("0.0001"), rounding=ROUND_HALF_UP
         )
 
@@ -123,6 +140,8 @@ class NordicPackagingCalculator(EPRCalculator):
                 "currency": self._rate_set.currency,
             },
             "rates_used": {m: str(r) for m, r in rates_used.items()},
+            "eco_modulation_by_material": eco_modulation_by_material,
+            "fixed_annual_fee": str(fixed_fee),
             "weight_by_material_kg": {m: str(w) for m, w in weight_by_material.items()},
             "fee_by_material": {m: str(f) for m, f in fee_by_material.items()},
             "total_weight_kg": str(total_weight),
@@ -144,7 +163,7 @@ class NordicPackagingCalculator(EPRCalculator):
             calculation_snapshot=snapshot,
         )
 
-    def _resolve_rate(self, material: str) -> Decimal:
+    def _resolve_rate_entry(self, material: str) -> RateEntry:
         rates = self._rate_set.rates
         if material in rates:
             return rates[material]
@@ -154,3 +173,7 @@ class NordicPackagingCalculator(EPRCalculator):
             f"No EPR rate for material '{material}' in {self.country_code} rate set, "
             "and no 'other' fallback rate is defined."
         )
+
+    def _resolve_rate(self, material: str) -> Decimal:
+        """Legacy helper — returns rate_per_kg from RateEntry."""
+        return self._resolve_rate_entry(material).rate_per_kg

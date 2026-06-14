@@ -45,7 +45,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from nordiq.api.routers import auth, customers, data_sources, products, calculations, submissions, audit  # noqa: E402
+from nordiq.api.routers import auth, customers, data_sources, products, calculations, submissions, audit, packaging  # noqa: E402
 
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(customers.router, prefix="/api/v1/customers", tags=["customers"])
@@ -54,6 +54,7 @@ app.include_router(products.router, prefix="/api/v1/products", tags=["products"]
 app.include_router(calculations.router, prefix="/api/v1/calculations", tags=["calculations"])
 app.include_router(submissions.router, prefix="/api/v1/submissions", tags=["submissions"])
 app.include_router(audit.router, prefix="/api/v1/audit-log", tags=["audit"])
+app.include_router(packaging.router, prefix="/api/v1/packaging-components", tags=["Packaging"])
 
 
 @app.get("/health", tags=["health"])

@@ -6,3 +6,4 @@ from nordiq.models.obligation import EPRObligation, EPRRate, ReportingDeadline  
 from nordiq.models.submission import PROSubmission  # noqa: F401
 from nordiq.models.audit import AuditLog, ImportJob  # noqa: F401
 from nordiq.models.user import User  # noqa: F401
+from nordiq.models.packaging import PackagingComponent  # noqa: F401
