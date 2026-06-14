@@ -5,7 +5,6 @@ from nordiq.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-
 async def send_via_ses(
     recipient_email: str,
     subject: str,

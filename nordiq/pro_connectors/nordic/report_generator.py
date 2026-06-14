@@ -84,6 +84,7 @@ class NordicReportGenerator:
             manifest_key = f"reports/{base_name}_manifest.json"
             s3_uri = s3_storage.upload_file(str(csv_path), s3_key)
             s3_storage.upload_file(str(manifest_path), manifest_key)
+            # Clean up local temp files
             csv_path.unlink(missing_ok=True)
             manifest_path.unlink(missing_ok=True)
             return ReportFile(

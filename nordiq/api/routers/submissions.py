@@ -212,6 +212,11 @@ async def download_report(
         raise HTTPException(status_code=404, detail="Submission not found")
     if not sub.report_file_path:
         raise HTTPException(status_code=404, detail="No report file for this submission")
+    if sub.report_file_path.startswith("s3://"):
+        from nordiq.storage import s3 as s3_storage
+        from fastapi.responses import RedirectResponse
+        url = s3_storage.presigned_url(sub.report_file_path)
+        return RedirectResponse(url=url)
     import os as _os
     if not _os.path.isfile(sub.report_file_path):
         raise HTTPException(status_code=404, detail="Report file not found on disk")
