@@ -30,6 +30,15 @@ class Settings(BaseSettings):
     # Storage
     report_storage_path: str = "./reports"
 
+    # AWS
+    aws_region: str = "eu-north-1"
+    aws_access_key_id: str = ""
+    aws_secret_access_key: str = ""
+    s3_bucket: str = ""
+    use_s3: bool = False  # set True to store reports in S3 instead of local disk
+    use_ses: bool = False  # set True to send email via AWS SES instead of SMTP
+    ses_from: str = ""    # SES verified sender; falls back to smtp_from if empty
+
     # App
     app_env: Literal["development", "staging", "production"] = "development"
     log_level: str = "INFO"

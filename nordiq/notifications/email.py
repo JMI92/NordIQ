@@ -56,6 +56,15 @@ async def send_deadline_warning(
         pro_id=pro_id,
     )
 
+    if settings.use_ses:
+        from nordiq.notifications.ses import send_via_ses
+        return await send_via_ses(
+            recipient_email=recipient_email,
+            subject=subject,
+            body_text=body,
+            body_html=_build_html_body(body, subject),
+        )
+
     msg = EmailMessage()
     msg["From"] = settings.smtp_from
     msg["To"] = recipient_email

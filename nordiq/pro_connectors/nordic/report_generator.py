@@ -76,6 +76,23 @@ class NordicReportGenerator:
 
         checksum = _sha256(csv_path)
 
+        from nordiq.core.config import get_settings
+        settings = get_settings()
+        if settings.use_s3 and settings.s3_bucket:
+            from nordiq.storage import s3 as s3_storage
+            s3_key = f"reports/{base_name}.csv"
+            manifest_key = f"reports/{base_name}_manifest.json"
+            s3_uri = s3_storage.upload_file(str(csv_path), s3_key)
+            s3_storage.upload_file(str(manifest_path), manifest_key)
+            csv_path.unlink(missing_ok=True)
+            manifest_path.unlink(missing_ok=True)
+            return ReportFile(
+                file_path=s3_uri,
+                file_format="csv",
+                checksum=checksum,
+                obligation_id=_obligation_key(obligation),
+            )
+
         return ReportFile(
             file_path=str(csv_path),
             file_format="csv",

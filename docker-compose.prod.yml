@@ -1,27 +1,39 @@
-# Production overrides — use with:
-#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Production overrides for AWS deployment.
+# Use with: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 #
-# Required env vars (set in .env or your secrets manager):
-#   SECRET_KEY          — random string, min 32 chars
-#   ENCRYPTION_KEY      — Fernet key (generate: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
-#   SMTP_HOST / SMTP_USER / SMTP_PASSWORD / SMTP_FROM
+# For ECS/Fargate: export individual environment variables from Secrets Manager
+# rather than using a .env file. The variables below map 1-to-1.
 #
-# Postgres credentials should be rotated from the defaults below.
+# RDS: set DATABASE_URL to your RDS endpoint — the bundled 'db' service is
+# not used in production.
 
 services:
   db:
+    # In production, point DATABASE_URL at Amazon RDS instead.
+    # You can disable this service entirely when using RDS.
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
-    ports: []  # do not expose DB port in production
+    ports: []
 
   api:
     environment:
       APP_ENV: production
       LOG_LEVEL: warning
-      DATABASE_URL: postgresql+asyncpg://nordiq:${POSTGRES_PASSWORD:?}@db:5432/nordiq
-      SYNC_DATABASE_URL: postgresql://nordiq:${POSTGRES_PASSWORD:?}@db:5432/nordiq
+      # RDS — replace @db: with your RDS endpoint
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://nordiq:${POSTGRES_PASSWORD}@db:5432/nordiq}
+      SYNC_DATABASE_URL: ${SYNC_DATABASE_URL:-postgresql://nordiq:${POSTGRES_PASSWORD}@db:5432/nordiq}
       FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL must be set}
       SMTP_TLS: "true"
+      # AWS
+      AWS_REGION: ${AWS_REGION:-eu-north-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      # S3 for report storage (recommended for ECS/Fargate — local disk is ephemeral)
+      USE_S3: ${USE_S3:-false}
+      S3_BUCKET: ${S3_BUCKET:-}
+      # SES for transactional email
+      USE_SES: ${USE_SES:-false}
+      SES_FROM: ${SES_FROM:-}
     deploy:
       resources:
         limits:
