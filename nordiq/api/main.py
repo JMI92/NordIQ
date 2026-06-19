@@ -1,4 +1,4 @@
-"""NordIQ FastAPI application entry point."""
+"""UUSIO FastAPI application entry point."""
 
 from contextlib import asynccontextmanager
 
@@ -28,7 +28,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="NordIQ EPR Compliance API",
+    title="UUSIO EPR Compliance API",
     description="API for managing EPR (Extended Producer Responsibility) compliance obligations.",
     version="0.1.0",
     lifespan=lifespan,

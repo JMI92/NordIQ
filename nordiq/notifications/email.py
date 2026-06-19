@@ -40,7 +40,7 @@ async def send_deadline_warning(
     settings = get_settings()
 
     subject = (
-        f"[NordIQ] ⚠️ EPR deadline in {days_remaining} day(s) — "
+        f"[UUSIO] ⚠️ EPR deadline in {days_remaining} day(s) — "
         f"{country_code} {product_category} due {submission_deadline}"
     )
 
@@ -111,7 +111,7 @@ def _build_body(
 
 Dear {recipient_name},
 
-This is an automated reminder from NordIQ for {customer_name}.
+This is an automated reminder from UUSIO for {customer_name}.
 
 You have an upcoming EPR reporting deadline:
 
@@ -122,13 +122,13 @@ You have an upcoming EPR reporting deadline:
   Submission due:    {submission_deadline}
   Days remaining:    {days_remaining}
 
-Please log in to NordIQ to run or review your calculation and submit your report
+Please log in to UUSIO to run or review your calculation and submit your report
 before the deadline.
 
 If you have already submitted this report, you can ignore this reminder.
 
 ---
-This email was sent automatically by NordIQ EPR Compliance.
+This email was sent automatically by UUSIO EPR Compliance.
 To stop receiving these notifications, contact your account administrator.
 """
 

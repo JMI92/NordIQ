@@ -13,7 +13,7 @@ variable "environment" {
 variable "app_name" {
   description = "Application name prefix for all resources"
   type        = string
-  default     = "nordiq"
+  default     = "uusio"
 }
 
 variable "vpc_cidr" {

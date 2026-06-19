@@ -24,20 +24,20 @@ class Settings(BaseSettings):
     smtp_port: int = 587
     smtp_user: str = ""
     smtp_password: str = ""
-    smtp_from: str = "notifications@nordiq.example.com"
+    smtp_from: str = "notifications@uusio.io"
     smtp_tls: bool = True
-
-    # Storage
-    report_storage_path: str = "./reports"
 
     # AWS
     aws_region: str = "eu-north-1"
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""
     s3_bucket: str = ""
-    use_s3: bool = False  # set True to store reports in S3 instead of local disk
-    use_ses: bool = False  # set True to send email via AWS SES instead of SMTP
+    use_s3: bool = False
+    use_ses: bool = False
     ses_from: str = ""    # SES verified sender; falls back to smtp_from if empty
+
+    # Storage
+    report_storage_path: str = "./reports"
 
     # App
     app_env: Literal["development", "staging", "production"] = "development"
@@ -48,7 +48,6 @@ class Settings(BaseSettings):
     @field_validator("encryption_key")
     @classmethod
     def encryption_key_must_be_set_in_production(cls, v: str, info) -> str:
-        # Validated at startup — empty key is acceptable in dev only
         return v
 
     @property
