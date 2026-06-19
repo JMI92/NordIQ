@@ -25,8 +25,13 @@ output "acm_validation_records" {
 resource "aws_acm_certificate_validation" "main" {
   certificate_arn = aws_acm_certificate.main.arn
 
-  # Validation happens via Cloudflare DNS — Terraform waits until AWS sees the CNAMEs
   timeouts {
-    create = "30m"
+    create = "45m"
+  }
+
+  # Run this AFTER adding the CNAME records shown in acm_validation_records output to Cloudflare.
+  # Until then, keep this resource commented out and use: terraform apply -target=aws_acm_certificate.main
+  lifecycle {
+    ignore_changes = [certificate_arn]
   }
 }
