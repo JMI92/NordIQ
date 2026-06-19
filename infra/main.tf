@@ -11,13 +11,12 @@ terraform {
     }
   }
 
-  # Uncomment to store state in S3 (recommended for teams)
-  # backend "s3" {
-  #   bucket  = "your-terraform-state-bucket"
-  #   key     = "nordiq/terraform.tfstate"
-  #   region  = "eu-north-1"
-  #   encrypt = true
-  # }
+  backend "s3" {
+    bucket  = "uusio-terraform-state-prod"
+    key     = "uusio/terraform.tfstate"
+    region  = "eu-north-1"
+    encrypt = true
+  }
 }
 
 provider "aws" {
