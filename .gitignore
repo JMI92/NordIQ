@@ -1,15 +1,33 @@
+# Python
 __pycache__/
 *.py[cod]
 *.pyo
-*.pyd
-.Python
+.eggs/
 *.egg-info/
 dist/
 build/
-.env
 .venv/
 venv/
-*.log
+
+# Environment
+.env
+*.env
+
+# Terraform
+infra/.terraform/
+infra/terraform.tfvars
+infra/*.tfstate
+infra/*.tfstate.*
+infra/.terraform.lock.hcl
+
+# Reports
+/tmp/nordiq_reports/
 reports/
-.pytest_cache/
-.ruff_cache/
+
+# Claude Code
+.claude/
+
+# IDE
+.idea/
+.vscode/
+*.swp
