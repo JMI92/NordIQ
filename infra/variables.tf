@@ -98,8 +98,14 @@ variable "frontend_desired_count" {
   default     = 1
 }
 
+variable "domain_name" {
+  description = "Primary domain name (e.g. uusio.io)"
+  type        = string
+  default     = "uusio.io"
+}
+
 variable "certificate_arn" {
-  description = "ACM certificate ARN for HTTPS. Leave empty to use HTTP only."
+  description = "ACM certificate ARN for HTTPS. Populated automatically from acm.tf after first apply."
   type        = string
   default     = ""
 }

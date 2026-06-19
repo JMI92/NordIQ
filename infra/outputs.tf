@@ -1,6 +1,16 @@
 output "alb_dns_name" {
-  description = "ALB DNS name — open this in your browser to access the app"
-  value       = "http://${aws_lb.main.dns_name}"
+  description = "ALB DNS name — set this as the CNAME target in Cloudflare"
+  value       = aws_lb.main.dns_name
+}
+
+output "app_url" {
+  description = "Public HTTPS URL after Cloudflare DNS is configured"
+  value       = "https://${var.domain_name}"
+}
+
+output "acm_certificate_arn" {
+  description = "ACM certificate ARN"
+  value       = aws_acm_certificate.main.arn
 }
 
 output "api_ecr_repository_url" {
