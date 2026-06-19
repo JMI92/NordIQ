@@ -1,0 +1,28 @@
+# Copy this file to terraform.tfvars and fill in the values.
+# terraform.tfvars is gitignored — never commit real values.
+
+aws_region   = "eu-north-1"
+environment  = "production"
+app_name     = "nordiq"
+
+db_instance_class = "db.t3.micro"
+db_name           = "nordiq"
+db_username       = "nordiq"
+
+# Fill in after pushing Docker images to ECR
+api_image      = "123456789012.dkr.ecr.eu-north-1.amazonaws.com/nordiq-api:latest"
+frontend_image = "123456789012.dkr.ecr.eu-north-1.amazonaws.com/nordiq-frontend:latest"
+
+api_cpu         = 256
+api_memory      = 512
+frontend_cpu    = 256
+frontend_memory = 512
+
+# HTTPS: leave empty for HTTP only, or provide ACM certificate ARN
+certificate_arn = ""
+
+# SES sender address (must be verified in SES)
+smtp_from = "notifications@yourdomain.com"
+
+# CloudWatch alarm destination
+alert_email = "admin@yourdomain.com"
