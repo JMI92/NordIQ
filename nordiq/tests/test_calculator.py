@@ -9,7 +9,7 @@ from decimal import Decimal
 import pytest
 
 from nordiq.calculators.base import ReportingPeriod
-from nordiq.calculators.nordic.packaging import NordicPackagingCalculator, RateSet
+from nordiq.calculators.nordic.packaging import NordicPackagingCalculator, RateEntry, RateSet
 from nordiq.calculators.registry import get_calculator_class
 from nordiq.ingestion.base import NormalizedProductData
 from nordiq.models.enums import DataRecordSource, MaterialType, ProductCategory
@@ -25,12 +25,12 @@ FI_RATES = RateSet(
     product_category=ProductCategory.PACKAGING,
     currency="EUR",
     rates={
-        "plastic": Decimal("0.45"),
-        "paper":   Decimal("0.08"),
-        "glass":   Decimal("0.06"),
-        "metal":   Decimal("0.12"),
-        "wood":    Decimal("0.04"),
-        "other":   Decimal("0.20"),
+        "plastic": RateEntry(rate_per_kg=Decimal("0.45")),
+        "paper":   RateEntry(rate_per_kg=Decimal("0.08")),
+        "glass":   RateEntry(rate_per_kg=Decimal("0.06")),
+        "metal":   RateEntry(rate_per_kg=Decimal("0.12")),
+        "wood":    RateEntry(rate_per_kg=Decimal("0.04")),
+        "other":   RateEntry(rate_per_kg=Decimal("0.20")),
     },
     valid_from=date(2024, 1, 1),
     regulation_reference="FI Packaging Producers Ltd 2024 fee schedule",
@@ -41,12 +41,12 @@ SE_RATES = RateSet(
     product_category=ProductCategory.PACKAGING,
     currency="SEK",
     rates={
-        "plastic": Decimal("0.50"),
-        "paper":   Decimal("0.10"),
-        "glass":   Decimal("0.07"),
-        "metal":   Decimal("0.15"),
-        "wood":    Decimal("0.05"),
-        "other":   Decimal("0.25"),
+        "plastic": RateEntry(rate_per_kg=Decimal("0.50")),
+        "paper":   RateEntry(rate_per_kg=Decimal("0.10")),
+        "glass":   RateEntry(rate_per_kg=Decimal("0.07")),
+        "metal":   RateEntry(rate_per_kg=Decimal("0.15")),
+        "wood":    RateEntry(rate_per_kg=Decimal("0.05")),
+        "other":   RateEntry(rate_per_kg=Decimal("0.25")),
     },
     valid_from=date(2024, 1, 1),
 )
@@ -56,12 +56,12 @@ NO_RATES = RateSet(
     product_category=ProductCategory.PACKAGING,
     currency="NOK",
     rates={
-        "plastic": Decimal("5.20"),
-        "paper":   Decimal("0.80"),
-        "glass":   Decimal("0.60"),
-        "metal":   Decimal("1.20"),
-        "wood":    Decimal("0.40"),
-        "other":   Decimal("2.50"),
+        "plastic": RateEntry(rate_per_kg=Decimal("5.20")),
+        "paper":   RateEntry(rate_per_kg=Decimal("0.80")),
+        "glass":   RateEntry(rate_per_kg=Decimal("0.60")),
+        "metal":   RateEntry(rate_per_kg=Decimal("1.20")),
+        "wood":    RateEntry(rate_per_kg=Decimal("0.40")),
+        "other":   RateEntry(rate_per_kg=Decimal("2.50")),
     },
     valid_from=date(2024, 1, 1),
 )
@@ -71,12 +71,12 @@ DK_RATES = RateSet(
     product_category=ProductCategory.PACKAGING,
     currency="DKK",
     rates={
-        "plastic": Decimal("3.50"),
-        "paper":   Decimal("0.60"),
-        "glass":   Decimal("0.45"),
-        "metal":   Decimal("0.90"),
-        "wood":    Decimal("0.30"),
-        "other":   Decimal("1.80"),
+        "plastic": RateEntry(rate_per_kg=Decimal("3.50")),
+        "paper":   RateEntry(rate_per_kg=Decimal("0.60")),
+        "glass":   RateEntry(rate_per_kg=Decimal("0.45")),
+        "metal":   RateEntry(rate_per_kg=Decimal("0.90")),
+        "wood":    RateEntry(rate_per_kg=Decimal("0.30")),
+        "other":   RateEntry(rate_per_kg=Decimal("1.80")),
     },
     valid_from=date(2024, 1, 1),
 )
@@ -244,7 +244,7 @@ def test_missing_rate_and_no_fallback_raises():
         country_code="FI",
         product_category=ProductCategory.PACKAGING,
         currency="EUR",
-        rates={"plastic": Decimal("0.45")},  # no 'other' fallback
+        rates={"plastic": RateEntry(rate_per_kg=Decimal("0.45"))},  # no 'other' fallback
         valid_from=date(2024, 1, 1),
     )
     calc = NordicPackagingCalculator(rates_no_fallback)

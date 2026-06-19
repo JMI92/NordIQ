@@ -12,7 +12,7 @@ from decimal import Decimal
 import pytest
 
 from nordiq.calculators.base import ReportingPeriod
-from nordiq.calculators.nordic.packaging import NordicPackagingCalculator, RateSet
+from nordiq.calculators.nordic.packaging import NordicPackagingCalculator, RateEntry, RateSet
 from nordiq.calculators.registry import get_calculator_class
 from nordiq.ingestion.base import NormalizedProductData
 from nordiq.models.enums import DataRecordSource, MaterialType, ProductCategory
@@ -26,12 +26,12 @@ RATE_SET = RateSet(
     product_category=ProductCategory.PACKAGING,
     currency="EUR",
     rates={
-        "plastic": Decimal("0.45"),
-        "paper": Decimal("0.08"),
-        "glass": Decimal("0.06"),
-        "metal": Decimal("0.12"),
-        "wood": Decimal("0.04"),
-        "other": Decimal("0.20"),
+        "plastic": RateEntry(rate_per_kg=Decimal("0.45")),
+        "paper":   RateEntry(rate_per_kg=Decimal("0.08")),
+        "glass":   RateEntry(rate_per_kg=Decimal("0.06")),
+        "metal":   RateEntry(rate_per_kg=Decimal("0.12")),
+        "wood":    RateEntry(rate_per_kg=Decimal("0.04")),
+        "other":   RateEntry(rate_per_kg=Decimal("0.20")),
     },
     valid_from=date(2024, 1, 1),
 )
@@ -160,7 +160,7 @@ def test_other_material_fallback_rate():
         country_code="FI",
         product_category=ProductCategory.PACKAGING,
         currency="EUR",
-        rates={"other": Decimal("0.20")},
+        rates={"other": RateEntry(rate_per_kg=Decimal("0.20"))},
         valid_from=date(2024, 1, 1),
     )
     calc = NordicPackagingCalculator(rate_set)
@@ -174,7 +174,7 @@ def test_missing_rate_raises():
         country_code="FI",
         product_category=ProductCategory.PACKAGING,
         currency="EUR",
-        rates={"paper": Decimal("0.08")},  # no "plastic" and no "other"
+        rates={"paper": RateEntry(rate_per_kg=Decimal("0.08"))},  # no "plastic" and no "other"
         valid_from=date(2024, 1, 1),
     )
     calc = NordicPackagingCalculator(rate_set)

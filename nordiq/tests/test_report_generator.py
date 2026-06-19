@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from nordiq.calculators.base import EPRObligation, ReportingPeriod
-from nordiq.calculators.nordic.packaging import NordicPackagingCalculator, RateSet
+from nordiq.calculators.nordic.packaging import NordicPackagingCalculator, RateEntry, RateSet
 from nordiq.models.enums import DataRecordSource, MaterialType, ProductCategory
 from nordiq.ingestion.base import NormalizedProductData
 from nordiq.pro_connectors.nordic.report_generator import NordicReportGenerator, _sha256
@@ -25,12 +25,12 @@ FI_RATES = RateSet(
     product_category=ProductCategory.PACKAGING,
     currency="EUR",
     rates={
-        "plastic": Decimal("0.45"),
-        "paper":   Decimal("0.08"),
-        "glass":   Decimal("0.06"),
-        "metal":   Decimal("0.12"),
-        "wood":    Decimal("0.04"),
-        "other":   Decimal("0.20"),
+        "plastic": RateEntry(rate_per_kg=Decimal("0.45")),
+        "paper":   RateEntry(rate_per_kg=Decimal("0.08")),
+        "glass":   RateEntry(rate_per_kg=Decimal("0.06")),
+        "metal":   RateEntry(rate_per_kg=Decimal("0.12")),
+        "wood":    RateEntry(rate_per_kg=Decimal("0.04")),
+        "other":   RateEntry(rate_per_kg=Decimal("0.20")),
     },
     valid_from=date(2024, 1, 1),
     regulation_reference="FI Packaging Producers Ltd 2024 fee schedule",
