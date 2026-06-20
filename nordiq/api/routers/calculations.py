@@ -229,7 +229,8 @@ async def run_calculation(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """Run an EPR calculation and persist the obligation.
+    """
+    Run an EPR calculation and persist the obligation.
 
     If an obligation with the same (customer, country, category, period) already
     exists in DRAFT status it is recalculated in place (idempotent).
@@ -316,7 +317,7 @@ async def finalise_obligation(
     return _obligation_to_response(ob)
 
 
-@router.delete("/{obligation_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{obligation_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_obligation(
     obligation_id: uuid.UUID,
     current_user: Annotated[User, Depends(get_current_user)],

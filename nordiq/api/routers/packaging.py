@@ -115,7 +115,7 @@ async def get_component(
     return comp
 
 
-@router.delete("/{component_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{component_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_component(
     component_id: uuid.UUID,
     current_user: Annotated[User, Depends(get_current_user)],
