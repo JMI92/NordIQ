@@ -86,3 +86,20 @@ resource "aws_lb_listener_rule" "api" {
     }
   }
 }
+
+# app.uusio.io → Streamlit frontend
+resource "aws_lb_listener_rule" "frontend_host" {
+  listener_arn = aws_lb_listener.https.arn
+  priority     = 20
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.frontend.arn
+  }
+
+  condition {
+    host_header {
+      values = ["app.${var.domain_name}"]
+    }
+  }
+}
