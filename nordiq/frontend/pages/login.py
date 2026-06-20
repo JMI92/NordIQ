@@ -1,7 +1,11 @@
 """Login page."""
 
+import os
+
 import streamlit as st
 from nordiq.frontend import api_client
+
+_DEFAULT_API_URL = os.getenv("API_URL", "http://localhost:8000")
 
 
 def render_login() -> None:
@@ -13,7 +17,7 @@ def render_login() -> None:
 
         api_url = st.text_input(
             "API URL",
-            value=st.session_state.get("api_url", "http://localhost:8000"),
+            value=st.session_state.get("api_url", _DEFAULT_API_URL),
         )
         username = st.text_input("Email")
         password = st.text_input("Password", type="password")
