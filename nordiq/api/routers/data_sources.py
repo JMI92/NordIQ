@@ -6,6 +6,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -128,14 +129,15 @@ async def update_data_source(
     return _to_response(ds)
 
 
-@router.delete("/{ds_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
+@router.delete("/{ds_id}")
 async def delete_data_source(
     ds_id: uuid.UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
-) -> None:
+) -> Response:
     ds = await _get_owned(ds_id, current_user, db)
     await db.delete(ds)
+    return Response(status_code=204)
 
 
 @router.post("/{ds_id}/test")

@@ -8,6 +8,7 @@ from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -317,12 +318,12 @@ async def finalise_obligation(
     return _obligation_to_response(ob)
 
 
-@router.delete("/{obligation_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
+@router.delete("/{obligation_id}")
 async def delete_obligation(
     obligation_id: uuid.UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
-):
+) -> Response:
     """Delete a DRAFT obligation. FINALISED/SUBMITTED obligations cannot be deleted."""
     ob = await _get_owned_obligation(obligation_id, current_user.customer_id, db)
     if ob.status != ObligationStatus.DRAFT:
@@ -332,3 +333,4 @@ async def delete_obligation(
         )
     await db.delete(ob)
     await db.commit()
+    return Response(status_code=204)

@@ -6,6 +6,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -115,12 +116,12 @@ async def get_component(
     return comp
 
 
-@router.delete("/{component_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
+@router.delete("/{component_id}")
 async def delete_component(
     component_id: uuid.UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
-):
+) -> Response:
     result = await db.execute(
         select(PackagingComponent).where(
             PackagingComponent.id == component_id,
@@ -132,3 +133,4 @@ async def delete_component(
         raise HTTPException(status_code=404, detail="Component not found")
     comp.is_active = False
     await db.commit()
+    return Response(status_code=204)
