@@ -62,39 +62,3 @@ async def health_check():
     """Liveness probe — returns 200 if the API is running and DB is reachable."""
     db_ok = await check_db_connection()
     return {"status": "ok" if db_ok else "degraded", "db": db_ok}
-
-
-@app.post("/api/v1/admin/seed", tags=["admin"], include_in_schema=False)
-async def seed_admin(token: str):
-    """One-time admin user creation. Disabled once an admin exists."""
-    import os
-    if token != os.environ.get("SEED_TOKEN", ""):
-        from fastapi import HTTPException
-        raise HTTPException(status_code=403, detail="Forbidden")
-
-    from sqlalchemy import select
-    from nordiq.core.database import async_session_factory
-    from nordiq.core.security import hash_password
-    from nordiq.models.customer import Customer
-    from nordiq.models.user import User
-
-    async with async_session_factory() as db:
-        existing = await db.execute(select(User).where(User.is_admin == True))  # noqa: E712
-        if existing.scalar_one_or_none():
-            return {"status": "already_exists"}
-
-        customer = Customer(name="Uusio", country_of_incorporation="FI")
-        db.add(customer)
-        await db.flush()
-
-        user = User(
-            customer_id=customer.id,
-            email="juho@uusio.io",
-            hashed_password=hash_password("Juhoika2203!"),
-            full_name="Juho Ikäläinen",
-            is_active=True,
-            is_admin=True,
-        )
-        db.add(user)
-        await db.commit()
-        return {"status": "created", "email": user.email, "customer_id": str(customer.id)}
