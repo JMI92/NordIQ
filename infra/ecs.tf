@@ -73,9 +73,10 @@ resource "aws_ecs_task_definition" "frontend" {
   task_role_arn            = aws_iam_role.ecs_task.arn
 
   container_definitions = jsonencode([{
-    name      = "frontend"
-    image     = var.frontend_image
-    essential = true
+    name       = "frontend"
+    image      = var.frontend_image
+    essential  = true
+    entryPoint = ["/app/scripts/entrypoint-frontend.sh"]
 
     portMappings = [{
       containerPort = 8501
