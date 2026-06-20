@@ -27,4 +27,4 @@ RUN chmod +x scripts/entrypoint.sh \
 USER nordiq
 
 # Default: API with migrations (overridden in docker-compose for frontend)
-ENTRYPOINT ["scripts/entrypoint.sh"]
+ENTRYPOINT ["/app/scripts/entrypoint.sh"]
