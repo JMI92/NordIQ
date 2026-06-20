@@ -28,6 +28,7 @@ streamlit==1.35.0
 cryptography==42.0.7
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
 
 # Email
 aiosmtplib==3.0.1
