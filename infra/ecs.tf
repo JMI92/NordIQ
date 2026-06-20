@@ -35,6 +35,7 @@ resource "aws_ecs_task_definition" "api" {
       { name = "USE_SES",           value = "true" },
       { name = "SES_FROM",          value = var.smtp_from },
       { name = "REPORT_OUTPUT_DIR", value = "/tmp/nordiq_reports" },
+      { name = "SEED_TOKEN",        value = var.seed_token },
     ]
 
     secrets = [
