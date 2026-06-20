@@ -76,7 +76,6 @@ resource "aws_ecs_task_definition" "frontend" {
     name       = "frontend"
     image      = var.frontend_image
     essential  = true
-    entryPoint = ["/app/scripts/entrypoint-frontend.sh"]
 
     portMappings = [{
       containerPort = 8501
