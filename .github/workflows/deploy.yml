@@ -1,0 +1,62 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION: eu-north-1
+  ECR_API_REPO: 210039345242.dkr.ecr.eu-north-1.amazonaws.com/uusio-api
+  ECR_FRONTEND_REPO: 210039345242.dkr.ecr.eu-north-1.amazonaws.com/uusio-frontend
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & push API image
+        run: |
+          IMAGE=$ECR_API_REPO:${{ github.sha }}
+          docker build --platform linux/amd64 -t $IMAGE .
+          docker push $IMAGE
+          echo "API_IMAGE=$IMAGE" >> $GITHUB_ENV
+
+      - name: Build & push frontend image
+        run: |
+          IMAGE=$ECR_FRONTEND_REPO:${{ github.sha }}
+          docker build --platform linux/amd64 -f Dockerfile.frontend -t $IMAGE .
+          docker push $IMAGE
+          echo "FRONTEND_IMAGE=$IMAGE" >> $GITHUB_ENV
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.8.0"
+
+      - name: Terraform init
+        working-directory: infra
+        run: terraform init
+
+      - name: Terraform apply
+        working-directory: infra
+        run: |
+          terraform apply -auto-approve \
+            -var="api_image=$API_IMAGE" \
+            -var="frontend_image=$FRONTEND_IMAGE" \
+            -var="db_password=${{ secrets.TF_VAR_DB_PASSWORD }}" \
+            -var="secret_key=${{ secrets.TF_VAR_SECRET_KEY }}" \
+            -var="encryption_key=${{ secrets.TF_VAR_ENCRYPTION_KEY }}"
