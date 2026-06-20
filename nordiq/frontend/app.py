@@ -1,9 +1,9 @@
-"""NordIQ Streamlit multi-page app entry point."""
+"""Uusio Streamlit multi-page app entry point."""
 
 import streamlit as st
 
 st.set_page_config(
-    page_title="NordIQ EPR Compliance",
+    page_title="Uusio EPR Compliance",
     page_icon="\U0001f331",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -31,7 +31,7 @@ PAGES = {
 }
 
 with st.sidebar:
-    st.title("\U0001f331 NordIQ")
+    st.title("\U0001f331 Uusio")
     st.caption("EPR Compliance Platform")
     st.divider()
     selection = st.radio("Navigate", list(PAGES.keys()), label_visibility="collapsed")

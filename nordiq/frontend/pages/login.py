@@ -11,7 +11,7 @@ _DEFAULT_API_URL = os.getenv("API_URL", "http://localhost:8000")
 def render_login() -> None:
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.title("\U0001f331 NordIQ")
+        st.title("\U0001f331 Uusio")
         st.subheader("EPR Compliance Platform")
         st.divider()
 
