@@ -117,10 +117,6 @@ resource "aws_ecs_service" "api" {
   }
 
   depends_on = [aws_lb_listener.http]
-
-  lifecycle {
-    ignore_changes = [task_definition]
-  }
 }
 
 resource "aws_ecs_service" "frontend" {
@@ -143,8 +139,4 @@ resource "aws_ecs_service" "frontend" {
   }
 
   depends_on = [aws_lb_listener.http]
-
-  lifecycle {
-    ignore_changes = [task_definition]
-  }
 }
