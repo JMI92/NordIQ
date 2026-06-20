@@ -84,7 +84,7 @@ resource "aws_ecs_task_definition" "frontend" {
     }]
 
     environment = [
-      { name = "API_URL", value = "http://${aws_lb.main.dns_name}" },
+      { name = "API_URL", value = "https://app.${var.domain_name}" },
     ]
 
     logConfiguration = {
