@@ -18,8 +18,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy source
 COPY . .
 
-# Non-root user for security
-RUN adduser --disabled-password --gecos "" nordiq \
+# Fix entrypoint permissions and create non-root user
+RUN chmod +x scripts/entrypoint.sh \
+    && adduser --disabled-password --gecos "" nordiq \
     && mkdir -p /app/reports /tmp/nordiq_reports \
     && chown -R nordiq:nordiq /app /tmp/nordiq_reports
 
