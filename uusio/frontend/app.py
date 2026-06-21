@@ -14,7 +14,8 @@ st.markdown("""
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-.stApp { background-color: #0A1A0A; }
+.stApp { background-color: #060606; }
+[data-testid="stAppViewContainer"] > .main { background-color: #060606; }
 
 /* ── Hide Streamlit's auto-generated page navigation ── */
 section[data-testid="stSidebarNav"] { display: none !important; }
@@ -62,7 +63,6 @@ section[data-testid="stSidebarNav"] { display: none !important; }
   border-left-color: #F5C430 !important;
   font-weight: 600 !important;
 }
-
 [data-testid="stSidebar"] .stCaption,
 [data-testid="stSidebar"] [data-testid="stCaptionContainer"] {
   color: #4a6a4a !important;
@@ -75,7 +75,6 @@ section[data-testid="stSidebarNav"] { display: none !important; }
   width: 100%;
   border-radius: 8px;
   font-size: 0.8rem;
-  letter-spacing: 0.3px;
   transition: all 0.15s;
 }
 [data-testid="stSidebar"] .stButton > button:hover {
@@ -91,7 +90,7 @@ h3 { color: #c8dcc8 !important; font-weight: 600; }
 
 /* ── Metric cards ───────────────────────────────────────────────── */
 [data-testid="stMetric"] {
-  background: #0f1f0f;
+  background: #0d1a0d;
   border: 1px solid #1a301a;
   border-radius: 12px;
   padding: 20px 24px;
@@ -109,7 +108,7 @@ h3 { color: #c8dcc8 !important; font-weight: 600; }
 /* ── Buttons ──────────────────────────────────────────────────────── */
 .stButton > button {
   background-color: #F5C430;
-  color: #0A1A0A;
+  color: #060606;
   border: none;
   border-radius: 8px;
   font-weight: 600;
@@ -126,7 +125,7 @@ h3 { color: #c8dcc8 !important; font-weight: 600; }
 
 /* ── Expanders ────────────────────────────────────────────────────── */
 [data-testid="stExpander"] {
-  background: #0f1f0f;
+  background: #0d1a0d;
   border: 1px solid #1a301a;
   border-radius: 10px;
   margin-bottom: 4px;
@@ -150,7 +149,7 @@ h3 { color: #c8dcc8 !important; font-weight: 600; }
 [data-testid="stNumberInput"] input,
 [data-testid="stTextArea"] textarea,
 [data-testid="stSelectbox"] > div > div {
-  background-color: #0f1f0f !important;
+  background-color: #0d1a0d !important;
   border: 1px solid #1a301a !important;
   border-radius: 8px !important;
   color: #e8f0e8 !important;
@@ -163,13 +162,13 @@ h3 { color: #c8dcc8 !important; font-weight: 600; }
 
 /* ── Misc ─────────────────────────────────────────────────────────── */
 [data-testid="stDataFrame"] { border: 1px solid #1a301a; border-radius: 10px; overflow: hidden; }
-[data-testid="stForm"] { background: #0f1f0f; border: 1px solid #1a301a; border-radius: 12px; padding: 20px; }
-hr { border-color: #1a301a !important; }
+[data-testid="stForm"] { background: #0d1a0d; border: 1px solid #1a301a; border-radius: 12px; padding: 20px; }
+hr { border-color: #1a1a1a !important; }
 .stCaption, [data-testid="stCaptionContainer"] { color: #4a6a4a !important; }
 code { background: #1a301a !important; color: #F5C430 !important; border-radius: 4px; padding: 1px 6px; }
 ::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: #0A1A0A; }
-::-webkit-scrollbar-thumb { background: #1a301a; border-radius: 3px; }
+::-webkit-scrollbar-track { background: #060606; }
+::-webkit-scrollbar-thumb { background: #1a1a1a; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #F5C430; }
 [data-testid="stAlert"] { border-radius: 10px !important; border-left-width: 3px !important; }
 </style>
