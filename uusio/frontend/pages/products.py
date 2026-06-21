@@ -1,4 +1,4 @@
-"""Tuotteiden hallinta: tuotekatalogi, materiaalikoostumus ja kuukausittaiset myöntimäärät."""
+"""Products, material composition and monthly sales volumes."""
 
 from __future__ import annotations
 
@@ -6,50 +6,64 @@ import io
 from datetime import date
 
 import streamlit as st
-
 from uusio.frontend import api_client
 
-MATERIALS = [
-    "plastic", "rigid_plastic", "flexible_plastic", "single_use_plastic",
-    "paper", "glass", "metal", "wood", "beverage_carton", "composite",
-    "electronics", "battery", "other",
-]
+MATERIAL_ICONS = {
+    "plastic":             "\U0001f9f4",
+    "rigid_plastic":       "\U0001f4e6",
+    "flexible_plastic":    "\U0001f6cd️",
+    "single_use_plastic":  "\U0001f964",
+    "paper":               "\U0001f4f0",
+    "glass":               "\U0001fab9",
+    "metal":               "⚙️",
+    "wood":                "\U0001fab5",
+    "beverage_carton":     "\U0001f9c3",
+    "composite":           "♻️",
+    "electronics":         "\U0001f4bb",
+    "battery":             "\U0001f50b",
+    "other":               "\U0001f4e6",
+}
+
+MATERIALS = list(MATERIAL_ICONS.keys())
+MONTH_NAMES = ["January","February","March","April","May","June",
+               "July","August","September","October","November","December"]
+
+
+def mat_label(m: str) -> str:
+    return f"{MATERIAL_ICONS.get(m, '\U0001f4e6')} {m.replace('_', ' ').title()}"
 
 
 def render() -> None:
-    st.title("\U0001f4e6 Tuotteet & Volyymit")
+    st.title("\U0001f4e6 Products & Volumes")
 
     tab_products, tab_volumes, tab_upload = st.tabs([
-        "\U0001f4cb Tuotteet & materiaalit",
-        "\U0001f4c8 Kuukausittaiset määrät",
-        "\U0001f4e4 CSV/Excel-lataus",
+        "\U0001f4cb Products & Materials",
+        "\U0001f4c8 Monthly Volumes",
+        "\U0001f4e4 CSV / Excel Upload",
     ])
 
     products = api_client.list_products(limit=1000)
     product_map = {f"{p['external_product_id']} — {p['description']}": p for p in products}
 
-    # ============================================================ Products tab
+    # ============================================================ Products
     with tab_products:
-        st.subheader("Tuotekatalogi")
-
+        st.subheader("Product catalogue")
         if not products:
-            st.info("Ei tuotteita. Lisää ensin tuotteet API:n kautta tai CSV-latauksella.")
+            st.info("No products yet. Add them via API or CSV upload.")
         else:
             import pandas as pd
-            df = pd.DataFrame(products)[["external_product_id", "description", "product_category", "unit_of_measure"]].rename(columns={
-                "external_product_id": "SKU", "description": "Kuvaus",
-                "product_category": "Kategoria", "unit_of_measure": "Yksikkö",
-            })
+            df = pd.DataFrame(products)[["external_product_id", "description", "product_category", "unit_of_measure"]]
+            df.columns = ["SKU", "Description", "Category", "Unit"]
             st.dataframe(df, use_container_width=True, hide_index=True)
 
         st.divider()
-        st.subheader("\U0001f9ea Materiaalikoostumus")
-        st.caption("Määritellä kuinka paljon kutakin materiaalia yksi tuoteyksikkö sisältää (kg/yksikkö). Tämä on pysyvä tieto.")
+        st.subheader("\U0001f9ea Material composition")
+        st.caption("Define how much of each material a single unit contains (kg / unit). This is stable master data.")
 
         if not products:
-            st.info("Lisää ensin tuotteet.")
+            st.info("Add products first.")
         else:
-            sel_label = st.selectbox("Valitse tuote", list(product_map.keys()), key="comp_prod")
+            sel_label = st.selectbox("Select product", list(product_map.keys()), key="comp_prod")
             sel_prod = product_map[sel_label]
 
             try:
@@ -57,52 +71,55 @@ def render() -> None:
             except Exception:
                 compositions = []
 
-            # Build editable dataframe
             import pandas as pd
             if compositions:
                 df_comp = pd.DataFrame(compositions)[["material_type", "is_packaging", "weight_per_unit_kg", "packaging_stream"]]
             else:
                 df_comp = pd.DataFrame(columns=["material_type", "is_packaging", "weight_per_unit_kg", "packaging_stream"])
 
-            st.caption("Muokkaa alla olevaa taulukkoa ja tallenna. `is_packaging=True` = pakkausmateriaali, `False` = itse tuote.")
-
+            st.caption("Edit the table and save. `is_packaging = True` = packaging material, `False` = the product itself.")
             edited = st.data_editor(
                 df_comp,
                 num_rows="dynamic",
                 use_container_width=True,
                 column_config={
-                    "material_type": st.column_config.SelectboxColumn("Materiaali", options=MATERIALS, required=True),
-                    "is_packaging": st.column_config.CheckboxColumn("Pakkaus?"),
-                    "weight_per_unit_kg": st.column_config.NumberColumn("Paino kg/yksikkö", min_value=0.0, format="%.6f"),
-                    "packaging_stream": st.column_config.SelectboxColumn("Virta", options=[None, "household", "commercial"]),
+                    "material_type": st.column_config.SelectboxColumn(
+                        "Material",
+                        options=MATERIALS,
+                        required=True,
+                        help="Select waste stream",
+                    ),
+                    "is_packaging": st.column_config.CheckboxColumn("Packaging?"),
+                    "weight_per_unit_kg": st.column_config.NumberColumn("kg / unit", min_value=0.0, format="%.6f"),
+                    "packaging_stream": st.column_config.SelectboxColumn("Stream", options=[None, "household", "commercial"]),
                 },
                 key=f"comp_editor_{sel_prod['id']}",
             )
 
-            if st.button("\U0001f4be Tallenna materiaalikoostumus", key="save_comp"):
+            # Show icon legend
+            with st.expander("Material icons legend"):
+                cols = st.columns(4)
+                for i, (mat, icon) in enumerate(MATERIAL_ICONS.items()):
+                    cols[i % 4].markdown(f"{icon} {mat.replace('_', ' ').title()}")
+
+            if st.button("\U0001f4be Save material composition", key="save_comp"):
                 rows = edited.dropna(subset=["material_type", "weight_per_unit_kg"]).to_dict("records")
-                payload = [
-                    {
-                        "material_type": r["material_type"],
-                        "is_packaging": bool(r.get("is_packaging", True)),
-                        "weight_per_unit_kg": float(r["weight_per_unit_kg"]),
-                        "packaging_stream": r.get("packaging_stream") or None,
-                    }
-                    for r in rows
-                ]
+                payload = [{"material_type": r["material_type"], "is_packaging": bool(r.get("is_packaging", True)),
+                            "weight_per_unit_kg": float(r["weight_per_unit_kg"]),
+                            "packaging_stream": r.get("packaging_stream") or None} for r in rows]
                 api_client.save_composition(sel_prod["id"], payload)
-                st.success("Materiaalikoostumus tallennettu.")
+                st.success("Composition saved.")
                 st.rerun()
 
-    # ========================================================== Volumes tab
+    # ============================================================ Volumes
     with tab_volumes:
-        st.subheader("Kuukausittaiset myöntimäärät")
-        st.caption("Syötä montako yksikköä kustakin tuotteesta myytiin kunakin kuukautena. Järjestelmä laskee kokonaispainot automaattisesti.")
+        st.subheader("Monthly sales volumes")
+        st.caption("Enter units sold per product per month. The system calculates total material weights automatically.")
 
         col1, col2 = st.columns(2)
-        sel_year = col1.number_input("Vuosi", value=date.today().year, min_value=2020, max_value=2030, step=1)
-        sel_month = col2.selectbox("Kuukausi", list(range(1, 13)),
-                                    format_func=lambda m: ["Tammikuu","Helmikuu","Maaliskuu","Huhtikuu","Toukokuu","Kesäkuu","Heinäkuu","Elokuu","Syyskuu","Lokakuu","Marraskuu","Joulukuu"][m-1],
+        sel_year = col1.number_input("Year", value=date.today().year, min_value=2020, max_value=2030, step=1)
+        sel_month = col2.selectbox("Month", list(range(1, 13)),
+                                    format_func=lambda m: MONTH_NAMES[m - 1],
                                     index=date.today().month - 2 if date.today().month > 1 else 0)
 
         try:
@@ -113,78 +130,74 @@ def render() -> None:
         vol_by_pid = {v["product_id"]: v["units_sold"] for v in existing_vols}
 
         if not products:
-            st.info("Ei tuotteita.")
+            st.info("No products.")
         else:
             import pandas as pd
             rows = []
             for p in products:
                 rows.append({
                     "SKU": p["external_product_id"],
-                    "Kuvaus": p["description"][:50],
-                    "Kategoria": p["product_category"],
-                    "Yksiköitä myyty": float(vol_by_pid.get(p["id"], 0)),
+                    "Description": p["description"][:50],
+                    "Category": p["product_category"],
+                    "Units sold": float(vol_by_pid.get(p["id"], 0)),
                     "_id": p["id"],
                 })
             df_vol = pd.DataFrame(rows)
             edited_vol = st.data_editor(
-                df_vol[["SKU", "Kuvaus", "Kategoria", "Yksiköitä myyty"]],
+                df_vol[["SKU", "Description", "Category", "Units sold"]],
                 num_rows="fixed",
                 use_container_width=True,
-                column_config={
-                    "Yksiköitä myyty": st.column_config.NumberColumn(min_value=0, format="%.2f"),
-                },
+                column_config={"Units sold": st.column_config.NumberColumn(min_value=0, format="%.2f")},
                 key=f"vol_editor_{sel_year}_{sel_month}",
             )
 
-            if st.button(f"\U0001f4be Tallenna {int(sel_year)}-{sel_month:02d} volyymit"):
+            if st.button(f"\U0001f4be Save {int(sel_year)}-{sel_month:02d} volumes"):
                 saved = 0
                 for i, row in edited_vol.iterrows():
                     prod = products[i]
-                    units = float(row["Yksiköitä myyty"])
+                    units = float(row["Units sold"])
                     if units > 0:
                         api_client.upsert_volume(prod["id"], int(sel_year), sel_month, units)
                         saved += 1
-                st.success(f"{saved} tuotteen volyymit tallennettu.")
+                st.success(f"{saved} product(s) saved.")
 
             st.divider()
-            st.subheader("\U0001f9ee Laske materiaalimäärät")
-            if st.button(f"Laske kokonaispainot {int(sel_year)}-{sel_month:02d}", type="primary"):
+            st.subheader("\U0001f9ee Calculate material totals")
+            if st.button(f"Calculate totals for {int(sel_year)}-{sel_month:02d}", type="primary"):
                 result = api_client.calculate_from_volumes(int(sel_year), sel_month)
                 if result.get("totals"):
                     import pandas as pd
-                    df_res = pd.DataFrame(result["totals"]).rename(columns={
-                        "product_category": "Kategoria",
-                        "material_type": "Materiaali",
-                        "is_packaging": "Pakkaus",
-                        "total_kg": "Yhteensä (kg)",
-                    })
-                    df_res["Yhteensä (kg)"] = df_res["Yhteensä (kg)"].round(3)
-                    st.dataframe(df_res, use_container_width=True, hide_index=True)
-                    st.info("Siirry Calculations-sivulle luodaksesi velvoitteet näistä luvuista.")
+                    df_res = pd.DataFrame(result["totals"])
+                    df_res["material"] = df_res["material_type"].apply(mat_label)
+                    df_res = df_res.rename(columns={"product_category": "Category", "is_packaging": "Packaging", "total_kg": "Total (kg)"})
+                    df_res["Total (kg)"] = df_res["Total (kg)"].round(3)
+                    st.dataframe(df_res[["Category", "material", "Packaging", "Total (kg)"]], use_container_width=True, hide_index=True)
+                    st.info("Go to **Calculations** to create obligations from these numbers.")
                 else:
-                    st.warning(result.get("message", "Ei tuloksia."))
+                    st.warning(result.get("message", "No results."))
 
-    # ========================================================== Upload tab
+    # ============================================================ Upload
     with tab_upload:
-        st.subheader("CSV/Excel-lataus")
+        st.subheader("CSV / Excel volume upload")
         st.markdown("""
-        Lataa tiedosto, jossa sarakkeet:
+        Upload a file with these columns:
+
         | sku | year | month | units_sold |
         |-----|------|-------|------------|
-        | SKU123 | 2026 | 1 | 5000 |
+        | SKU123 | 2026 | 6 | 5000 |
 
-        Tiedostomuodot: `.csv` tai `.xlsx`
+        Supported formats: `.csv`, `.xlsx`
         """)
 
-        uploaded = st.file_uploader("Valitse tiedosto", type=["csv", "xlsx", "xls"], key="vol_upload")
-        if uploaded and st.button("Lataa ja käsittele", type="primary"):
+        uploaded = st.file_uploader("Choose file", type=["csv", "xlsx", "xls"], key="vol_upload")
+        if uploaded and st.button("Upload & process", type="primary"):
             result = api_client.upload_volumes_csv(uploaded.read(), uploaded.name)
             if result:
-                st.success(f"✅ Käsitelty: {result.get('processed', 0)} riviä. Ohitettu (tuntematon SKU): {result.get('skipped_unknown_sku', 0)}.")
+                st.success(f"✅ Processed: {result.get('processed', 0)} rows. Skipped (unknown SKU): {result.get('skipped_unknown_sku', 0)}.")
             st.rerun()
 
         st.divider()
-        st.subheader("Lataa malli")
+        st.subheader("Download template")
         if products:
             import pandas as pd
             template = pd.DataFrame([
@@ -194,8 +207,10 @@ def render() -> None:
             buf = io.BytesIO()
             template.to_csv(buf, index=False)
             st.download_button(
-                "\U0001f4e5 Lataa CSV-malli",
+                "\U0001f4e5 Download CSV template",
                 data=buf.getvalue(),
-                file_name=f"volyymit_malli_{date.today().year}_{date.today().month:02d}.csv",
+                file_name=f"volumes_template_{date.today().year}_{date.today().month:02d}.csv",
                 mime="text/csv",
             )
+        else:
+            st.info("Add products first to generate a template.")
