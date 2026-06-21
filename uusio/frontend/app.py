@@ -18,7 +18,7 @@ if "token" not in st.session_state:
     render_login()
     st.stop()
 
-# Fetch current user info once per session to determine is_admin
+# Fetch current user info once per session
 if "is_admin" not in st.session_state:
     from uusio.frontend import api_client
     try:
@@ -34,17 +34,18 @@ if "is_admin" not in st.session_state:
 # ---------------------------------------------------------------------------
 
 PAGES: dict[str, str] = {
-    "\U0001f4ca Dashboard":      "uusio.frontend.pages.dashboard",
-    "\U0001f50c Data Sources":   "uusio.frontend.pages.data_sources",
-    "\U0001f4e6 Products":       "uusio.frontend.pages.products",
-    "\U0001f9ee Calculations":   "uusio.frontend.pages.calculations",
-    "\U0001f4e4 Submissions":    "uusio.frontend.pages.submissions",
-    "\U0001f4d6 Regulations":    "uusio.frontend.pages.regulations",
+    "\U0001f4ca Dashboard":         "uusio.frontend.pages.dashboard",
+    "\U0001f3e2 Oma portaali":      "uusio.frontend.pages.portal",
+    "\U0001f4d6 Säännöskirjasto":  "uusio.frontend.pages.regulations",
+    "\U0001f50c Data Sources":      "uusio.frontend.pages.data_sources",
+    "\U0001f4e6 Products":          "uusio.frontend.pages.products",
+    "\U0001f9ee Calculations":      "uusio.frontend.pages.calculations",
+    "\U0001f4e4 Submissions":       "uusio.frontend.pages.submissions",
 }
 
 if st.session_state.get("is_admin"):
     PAGES["\U0001f6e1️ Admin"] = "uusio.frontend.pages.admin"
-    PAGES["\U0001f4b3 Billing"] = "uusio.frontend.pages.billing"
+    PAGES["\U0001f4b3 Billing"]     = "uusio.frontend.pages.billing"
 
 with st.sidebar:
     st.title("\U0001f331 Uusio")

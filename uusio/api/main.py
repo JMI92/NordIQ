@@ -52,6 +52,8 @@ from uusio.api.routers import (  # noqa: E402
     customers,
     data_sources,
     packaging,
+    portal,
+    pro_registry,
     products,
     regulations,
     submissions,
@@ -69,6 +71,8 @@ app.include_router(packaging.router,    prefix="/api/v1/packaging-components",  
 app.include_router(admin.router,        prefix="/api/v1/admin",                 tags=["admin"])
 app.include_router(billing.router,      prefix="/api/v1/billing",               tags=["billing"])
 app.include_router(regulations.router,  prefix="/api/v1/regulations",           tags=["regulations"])
+app.include_router(pro_registry.router, prefix="/api/v1/pro-registry",          tags=["pro-registry"])
+app.include_router(portal.router,       prefix="/api/v1/portal",                tags=["portal"])
 
 
 @app.get("/health", tags=["health"])
