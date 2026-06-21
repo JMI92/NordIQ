@@ -16,6 +16,11 @@ st.markdown("""
 html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .stApp { background-color: #0A1A0A; }
 
+/* ── Hide Streamlit's auto-generated page navigation ── */
+section[data-testid="stSidebarNav"] { display: none !important; }
+[data-testid="stSidebarNavItems"] { display: none !important; }
+[data-testid="stSidebarNavSeparator"] { display: none !important; }
+
 /* ── Sidebar ─────────────────────────────────────────────────────── */
 [data-testid="stSidebar"] {
   background-color: #0d1f0d;
@@ -84,7 +89,7 @@ h1 { color: #F5C430 !important; font-weight: 700; letter-spacing: -0.5px; }
 h2 { color: #e8f0e8 !important; font-weight: 600; }
 h3 { color: #c8dcc8 !important; font-weight: 600; }
 
-/* ── Metric cards ─────────────────────────────────────────────────  */
+/* ── Metric cards ───────────────────────────────────────────────── */
 [data-testid="stMetric"] {
   background: #0f1f0f;
   border: 1px solid #1a301a;
@@ -166,8 +171,6 @@ code { background: #1a301a !important; color: #F5C430 !important; border-radius:
 ::-webkit-scrollbar-track { background: #0A1A0A; }
 ::-webkit-scrollbar-thumb { background: #1a301a; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #F5C430; }
-
-/* Alert / info boxes */
 [data-testid="stAlert"] { border-radius: 10px !important; border-left-width: 3px !important; }
 </style>
 """, unsafe_allow_html=True)
@@ -203,23 +206,17 @@ if st.session_state.get("is_admin"):
 
 with st.sidebar:
     st.markdown(
-        "<h1 style='margin-bottom:0;padding-bottom:0;margin-top:8px'>Uusi<span style='color:#F5C430'>O</span></h1>"
-        "<p style='color:#3a5a3a;font-size:0.68rem;margin-top:4px;letter-spacing:1.8px;text-transform:uppercase'>Simplifying EPR Compliance</p>",
+        "<h1 style='margin-bottom:0;padding-bottom:0;margin-top:8px'>"
+        "Uusi<span style='color:#F5C430'>O</span></h1>"
+        "<p style='color:#3a5a3a;font-size:0.68rem;margin-top:4px;letter-spacing:1.8px;"
+        "text-transform:uppercase'>Simplifying EPR Compliance</p>",
         unsafe_allow_html=True,
     )
-    st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
     if st.session_state.get("user_email"):
         st.caption(st.session_state["user_email"])
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
     selection = st.radio("Navigate", list(PAGES.keys()), label_visibility="collapsed")
-    st.markdown("<div style='flex:1'></div>", unsafe_allow_html=True)
-    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
-    if st.session_state.get("is_admin"):
-        st.markdown(
-            "<div style='font-size:0.65rem;color:#2a4a2a;text-transform:uppercase;"
-            "letter-spacing:1.2px;padding:0 14px;margin-bottom:4px'>Admin</div>",
-            unsafe_allow_html=True,
-        )
     st.markdown("<div style='height:32px'></div>", unsafe_allow_html=True)
     if st.button("Sign out", use_container_width=True):
         st.session_state.clear()
