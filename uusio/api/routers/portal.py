@@ -1,22 +1,15 @@
-"""Customer self-service portal endpoints.
-
-Every authenticated user can see their own customer's data:
-- Active PRO registrations
-- Reporting archive (submissions + presigned download URLs)
-- Customer document files in S3
-"""
+"""Portal self-service: PRO registrations, reporting calendar, report archive, documents."""
 
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from uusio.api.dependencies import get_current_user, get_db
-from uusio.models.customer import Customer
-from uusio.models.obligation import EPRObligation
+from uusio.models.obligation import EPRObligation, ReportingDeadline
 from uusio.models.pro_registry import CustomerPRORegistration
 from uusio.models.submission import PROSubmission
 from uusio.models.user import User
@@ -29,7 +22,6 @@ async def portal_summary(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """High-level summary for the customer portal home."""
     regs = (await db.execute(
         select(CustomerPRORegistration)
         .options(selectinload(CustomerPRORegistration.pro))
@@ -47,8 +39,7 @@ async def portal_summary(
         select(PROSubmission).where(PROSubmission.customer_id == current_user.customer_id)
     )).scalars().all()
 
-    active_countries = list({r.pro.country_code for r in regs if r.pro})
-    active_countries.sort()
+    active_countries = sorted({r.pro.country_code for r in regs if r.pro})
 
     return {
         "active_pro_count": len(regs),
@@ -64,7 +55,6 @@ async def my_registrations(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """Customer's own PRO registrations."""
     regs = (await db.execute(
         select(CustomerPRORegistration)
         .options(selectinload(CustomerPRORegistration.pro))
@@ -95,12 +85,113 @@ async def my_registrations(
     ]
 
 
+@router.get("/reporting-calendar")
+async def reporting_calendar(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Upcoming reporting deadlines for this customer's active PRO registrations."""
+    from datetime import date, timedelta
+
+    regs = (await db.execute(
+        select(CustomerPRORegistration)
+        .options(selectinload(CustomerPRORegistration.pro))
+        .where(
+            CustomerPRORegistration.customer_id == current_user.customer_id,
+            CustomerPRORegistration.status == "active",
+        )
+    )).scalars().all()
+
+    if not regs:
+        return []
+
+    today = date.today()
+    horizon = today.replace(year=today.year + 1)  # look 12 months ahead
+
+    # Collect (country_code, category, pro_key) combos from active registrations
+    pro_by_key: dict = {}
+    active_combos: list[tuple[str, str, str]] = []
+    for reg in regs:
+        if reg.pro:
+            active_combos.append((reg.pro.country_code, reg.pro.category, reg.pro.pro_key))
+            pro_by_key[reg.pro.pro_key] = reg.pro
+
+    # Pull deadlines for matching countries/categories within horizon
+    active_countries = [c for c, _, _ in active_combos]
+    deadlines = (await db.execute(
+        select(ReportingDeadline)
+        .where(
+            ReportingDeadline.submission_deadline >= today,
+            ReportingDeadline.submission_deadline <= horizon,
+            ReportingDeadline.country_code.in_(active_countries),
+        )
+        .order_by(ReportingDeadline.submission_deadline)
+    )).scalars().all()
+
+    # Match deadlines to customer's specific PRO registrations
+    result = []
+    for dl in deadlines:
+        # Find matching registration (same country + category mapping)
+        matched_reg = next(
+            (r for r in regs if r.pro and r.pro.country_code == dl.country_code
+             and r.pro.pro_key == dl.pro_id),
+            None,
+        )
+        if not matched_reg:
+            # Also check by country_code alone if category matches
+            matched_reg = next(
+                (r for r in regs if r.pro and r.pro.country_code == dl.country_code),
+                None,
+            )
+        if not matched_reg:
+            continue
+
+        days_until = (dl.submission_deadline - today).days
+        if days_until <= 7:
+            urgency = "critical"
+        elif days_until <= 30:
+            urgency = "warning"
+        else:
+            urgency = "ok"
+
+        # Check if obligation exists for this period
+        obligation = (await db.execute(
+            select(EPRObligation)
+            .where(
+                EPRObligation.customer_id == current_user.customer_id,
+                EPRObligation.country_code == dl.country_code,
+                EPRObligation.reporting_period_start == dl.reporting_period_start,
+                EPRObligation.reporting_period_end == dl.reporting_period_end,
+            )
+            .limit(1)
+        )).scalar_one_or_none()
+
+        pro = matched_reg.pro
+        result.append({
+            "deadline_id": str(dl.id),
+            "country_code": dl.country_code,
+            "product_category": dl.product_category,
+            "pro_id": dl.pro_id,
+            "pro_name": pro.name if pro else dl.pro_id,
+            "pro_portal_url": pro.portal_url if pro else None,
+            "reporting_period_start": dl.reporting_period_start.isoformat(),
+            "reporting_period_end": dl.reporting_period_end.isoformat(),
+            "submission_deadline": dl.submission_deadline.isoformat(),
+            "days_until_deadline": days_until,
+            "urgency": urgency,
+            "obligation_status": obligation.status if obligation else None,
+            "obligation_id": str(obligation.id) if obligation else None,
+            "notes": dl.notes,
+        })
+
+    return result
+
+
 @router.get("/reports")
 async def my_reports(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """Reporting archive: all submissions with presigned download links."""
     subs = (await db.execute(
         select(PROSubmission)
         .options(selectinload(PROSubmission.obligation))
@@ -117,7 +208,6 @@ async def my_reports(
                 download_url = presigned_url(s.report_file_path, expires_in=3600)
             except Exception:
                 pass
-
         obl = s.obligation
         result.append({
             "id": str(s.id),
@@ -131,8 +221,8 @@ async def my_reports(
             "obligation": {
                 "country_code": obl.country_code if obl else None,
                 "product_category": obl.product_category if obl else None,
-                "period_start": obl.period_start.isoformat() if obl and obl.period_start else None,
-                "period_end": obl.period_end.isoformat() if obl and obl.period_end else None,
+                "period_start": obl.reporting_period_start.isoformat() if obl else None,
+                "period_end": obl.reporting_period_end.isoformat() if obl else None,
                 "total_weight_kg": float(obl.total_weight_kg) if obl and obl.total_weight_kg else None,
                 "fee_amount": float(obl.fee_amount) if obl and obl.fee_amount else None,
                 "currency": obl.currency if obl else None,
@@ -144,15 +234,13 @@ async def my_reports(
 @router.get("/files")
 async def list_my_files(
     current_user: Annotated[User, Depends(get_current_user)],
-    folder: str | None = Query(None, description="contracts | reports | invoices | audits"),
+    folder: str | None = Query(None),
 ):
-    """List files in the customer's S3 folder."""
-    from uusio.storage.s3 import customer_prefix, list_objects
+    from uusio.storage.s3 import customer_prefix, list_objects, presigned_url
     prefix = customer_prefix(str(current_user.customer_id), folder or "")
     files = list_objects(prefix)
     result = []
     for f in files:
-        from uusio.storage.s3 import presigned_url
         try:
             url = presigned_url(f["s3_uri"], expires_in=3600)
         except Exception:
@@ -165,11 +253,10 @@ async def list_my_files(
 async def upload_my_file(
     current_user: Annotated[User, Depends(get_current_user)],
     file: UploadFile = File(...),
-    folder: str = Query("contracts", description="contracts | reports | invoices | audits"),
+    folder: str = Query("contracts"),
 ):
-    """Upload a file to the customer's S3 folder."""
-    from uusio.storage.s3 import customer_prefix, upload_bytes
     import re
+    from uusio.storage.s3 import customer_prefix, upload_bytes
     safe_name = re.sub(r"[^\w.\-]", "_", file.filename or "upload")
     key = f"{customer_prefix(str(current_user.customer_id), folder)}{safe_name}"
     data = await file.read()
