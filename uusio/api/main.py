@@ -18,12 +18,12 @@ async def lifespan(app: FastAPI):
         raise RuntimeError("Database connection failed on startup")
 
     from uusio.core.database import async_session_factory
-    from uusio.scheduler.jobs import setup_scheduler, shutdown_scheduler
+    from uusio.scheduler.jobs import setup_scheduler
     setup_scheduler(async_session_factory)
 
     yield
 
-    from uusio.scheduler.jobs import shutdown_scheduler  # noqa: F811
+    from uusio.scheduler.jobs import shutdown_scheduler
     shutdown_scheduler()
 
 
@@ -44,16 +44,31 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from uusio.api.routers import auth, customers, data_sources, products, calculations, submissions, audit, packaging  # noqa: E402
+from uusio.api.routers import (  # noqa: E402
+    admin,
+    auth,
+    billing,
+    calculations,
+    customers,
+    data_sources,
+    packaging,
+    products,
+    regulations,
+    submissions,
+    audit,
+)
 
-app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
-app.include_router(customers.router, prefix="/api/v1/customers", tags=["customers"])
-app.include_router(data_sources.router, prefix="/api/v1/data-sources", tags=["data-sources"])
-app.include_router(products.router, prefix="/api/v1/products", tags=["products"])
-app.include_router(calculations.router, prefix="/api/v1/calculations", tags=["calculations"])
-app.include_router(submissions.router, prefix="/api/v1/submissions", tags=["submissions"])
-app.include_router(audit.router, prefix="/api/v1/audit-log", tags=["audit"])
-app.include_router(packaging.router, prefix="/api/v1/packaging-components", tags=["Packaging"])
+app.include_router(auth.router,         prefix="/api/v1/auth",                  tags=["auth"])
+app.include_router(customers.router,    prefix="/api/v1/customers",             tags=["customers"])
+app.include_router(data_sources.router, prefix="/api/v1/data-sources",          tags=["data-sources"])
+app.include_router(products.router,     prefix="/api/v1/products",              tags=["products"])
+app.include_router(calculations.router, prefix="/api/v1/calculations",          tags=["calculations"])
+app.include_router(submissions.router,  prefix="/api/v1/submissions",           tags=["submissions"])
+app.include_router(audit.router,        prefix="/api/v1/audit-log",             tags=["audit"])
+app.include_router(packaging.router,    prefix="/api/v1/packaging-components",  tags=["packaging"])
+app.include_router(admin.router,        prefix="/api/v1/admin",                 tags=["admin"])
+app.include_router(billing.router,      prefix="/api/v1/billing",               tags=["billing"])
+app.include_router(regulations.router,  prefix="/api/v1/regulations",           tags=["regulations"])
 
 
 @app.get("/health", tags=["health"])

@@ -18,21 +18,39 @@ if "token" not in st.session_state:
     render_login()
     st.stop()
 
+# Fetch current user info once per session to determine is_admin
+if "is_admin" not in st.session_state:
+    from uusio.frontend import api_client
+    try:
+        me = api_client.get_me()
+        st.session_state["is_admin"] = me.get("is_admin", False)
+        st.session_state["user_email"] = me.get("email", "")
+    except Exception:
+        st.session_state["is_admin"] = False
+        st.session_state["user_email"] = ""
+
 # ---------------------------------------------------------------------------
 # Navigation
 # ---------------------------------------------------------------------------
 
-PAGES = {
+PAGES: dict[str, str] = {
     "\U0001f4ca Dashboard":      "uusio.frontend.pages.dashboard",
     "\U0001f50c Data Sources":   "uusio.frontend.pages.data_sources",
     "\U0001f4e6 Products":       "uusio.frontend.pages.products",
     "\U0001f9ee Calculations":   "uusio.frontend.pages.calculations",
     "\U0001f4e4 Submissions":    "uusio.frontend.pages.submissions",
+    "\U0001f4d6 Regulations":    "uusio.frontend.pages.regulations",
 }
+
+if st.session_state.get("is_admin"):
+    PAGES["\U0001f6e1️ Admin"] = "uusio.frontend.pages.admin"
+    PAGES["\U0001f4b3 Billing"] = "uusio.frontend.pages.billing"
 
 with st.sidebar:
     st.title("\U0001f331 Uusio")
     st.caption("EPR Compliance Platform")
+    if st.session_state.get("user_email"):
+        st.caption(f"\U0001f464 {st.session_state['user_email']}")
     st.divider()
     selection = st.radio("Navigate", list(PAGES.keys()), label_visibility="collapsed")
     st.divider()
