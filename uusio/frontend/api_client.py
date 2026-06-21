@@ -8,6 +8,14 @@ import requests
 import streamlit as st
 
 
+class APIError(Exception):
+    """Raised when the API returns a non-2xx response."""
+    def __init__(self, status_code: int, detail: str):
+        self.status_code = status_code
+        self.detail = detail
+        super().__init__(f"API {status_code}: {detail}")
+
+
 def _base_url() -> str:
     return st.session_state.get("api_url") or os.getenv("API_URL", "http://localhost:8000")
 
@@ -20,13 +28,23 @@ def _headers() -> dict:
 def _handle(response: requests.Response) -> Any:
     if response.status_code == 401:
         st.session_state.clear()
-        st.error("Session expired — please log in again.")
+        st.error("Istunto vanhentunut — kirjaudu uudelleen.")
         st.stop()
     if not response.ok:
-        detail = response.json().get("detail", response.text) if response.content else response.text
-        st.error(f"API error {response.status_code}: {detail}")
-        st.stop()
+        try:
+            detail = response.json().get("detail", response.text)
+        except Exception:
+            detail = response.text or str(response.status_code)
+        raise APIError(response.status_code, detail)
     return None if response.status_code == 204 else response.json()
+
+
+def _show_error(e: Exception) -> None:
+    """Display an API error in the UI without stopping the page."""
+    if isinstance(e, APIError):
+        st.error(f"API-virhe {e.status_code}: {e.detail}")
+    else:
+        st.error(str(e))
 
 
 # Auth
