@@ -12,38 +12,163 @@ st.set_page_config(
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .stApp { background-color: #0A1A0A; }
-[data-testid="stSidebar"] { background-color: #0d1f0d; border-right: 1px solid #1e3a1e; }
-[data-testid="stSidebar"] .stMarkdown p, [data-testid="stSidebar"] label { color: #d4e8d4 !important; }
-[data-testid="stSidebar"] h1 { color: #F5C430 !important; font-size: 1.6rem !important; font-weight: 700 !important; letter-spacing: -0.5px; }
+
+/* ── Sidebar ─────────────────────────────────────────────────────── */
+[data-testid="stSidebar"] {
+  background-color: #0d1f0d;
+  border-right: 1px solid #1a301a;
+}
+[data-testid="stSidebar"] h1 {
+  color: #F5C430 !important;
+  font-size: 1.5rem !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.5px;
+}
+
+/* Nav radio — hide the default circle indicator */
+[data-testid="stSidebar"] [data-testid="stRadio"] > div > label > div:first-child {
+  display: none !important;
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] > div > label {
+  display: flex !important;
+  align-items: center !important;
+  padding: 9px 14px !important;
+  margin: 1px 0 !important;
+  border-radius: 8px !important;
+  border-left: 2px solid transparent !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  color: #6a8a6a !important;
+  font-size: 0.875rem !important;
+  font-weight: 400 !important;
+  letter-spacing: 0.1px !important;
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] > div > label:hover {
+  background: rgba(245,196,48,0.07) !important;
+  color: #d4c090 !important;
+  border-left-color: rgba(245,196,48,0.25) !important;
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] > div > label:has(input:checked) {
+  background: rgba(245,196,48,0.10) !important;
+  color: #F5C430 !important;
+  border-left-color: #F5C430 !important;
+  font-weight: 600 !important;
+}
+
+[data-testid="stSidebar"] .stCaption,
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] {
+  color: #4a6a4a !important;
+  font-size: 0.75rem !important;
+}
+[data-testid="stSidebar"] .stButton > button {
+  background: transparent;
+  border: 1px solid #1e361e;
+  color: #4a6a4a;
+  width: 100%;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  letter-spacing: 0.3px;
+  transition: all 0.15s;
+}
+[data-testid="stSidebar"] .stButton > button:hover {
+  border-color: #F5C430;
+  color: #F5C430;
+  transform: none;
+}
+
+/* ── Typography ──────────────────────────────────────────────────── */
 h1 { color: #F5C430 !important; font-weight: 700; letter-spacing: -0.5px; }
 h2 { color: #e8f0e8 !important; font-weight: 600; }
 h3 { color: #c8dcc8 !important; font-weight: 600; }
-[data-testid="stMetric"] { background: #142014; border: 1px solid #1e3a1e; border-radius: 12px; padding: 16px 20px; }
-[data-testid="stMetricLabel"] { color: #8aaa8a !important; font-size: 0.78rem !important; text-transform: uppercase; letter-spacing: 0.5px; }
-[data-testid="stMetricValue"] { color: #F5C430 !important; font-weight: 700; }
-.stButton > button { background-color: #F5C430; color: #0A1A0A; border: none; border-radius: 8px; font-weight: 600; transition: background 0.2s, transform 0.1s; }
+
+/* ── Metric cards ─────────────────────────────────────────────────  */
+[data-testid="stMetric"] {
+  background: #0f1f0f;
+  border: 1px solid #1a301a;
+  border-radius: 12px;
+  padding: 20px 24px;
+  transition: border-color 0.2s;
+}
+[data-testid="stMetric"]:hover { border-color: rgba(245,196,48,0.3); }
+[data-testid="stMetricLabel"] {
+  color: #4a6a4a !important;
+  font-size: 0.72rem !important;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+[data-testid="stMetricValue"] { color: #F5C430 !important; font-weight: 700; font-size: 2rem !important; }
+
+/* ── Buttons ──────────────────────────────────────────────────────── */
+.stButton > button {
+  background-color: #F5C430;
+  color: #0A1A0A;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  transition: background 0.2s, transform 0.1s;
+}
 .stButton > button:hover { background-color: #f0b800; transform: translateY(-1px); }
-.stButton > button[kind="secondary"] { background-color: transparent; border: 1px solid #F5C430; color: #F5C430; }
-[data-testid="stExpander"] { background: #142014; border: 1px solid #1e3a1e; border-radius: 10px; margin-bottom: 6px; }
-[data-testid="stExpander"] summary { color: #e8f0e8; font-weight: 500; }
+.stButton > button[kind="secondary"] {
+  background-color: transparent;
+  border: 1px solid #1e3a1e;
+  color: #8aaa8a;
+}
+.stButton > button[kind="secondary"]:hover { border-color: #F5C430; color: #F5C430; }
+
+/* ── Expanders ────────────────────────────────────────────────────── */
+[data-testid="stExpander"] {
+  background: #0f1f0f;
+  border: 1px solid #1a301a;
+  border-radius: 10px;
+  margin-bottom: 4px;
+}
+[data-testid="stExpander"] summary { color: #c8dcc8; font-weight: 500; }
 [data-testid="stExpander"] summary:hover { color: #F5C430; }
-[data-testid="stTabs"] [data-testid="stTab"] { color: #8aaa8a; border-bottom: 2px solid transparent; }
-[data-testid="stTabs"] [aria-selected="true"] { color: #F5C430 !important; border-bottom: 2px solid #F5C430 !important; }
-[data-testid="stTextInput"] input, [data-testid="stNumberInput"] input, [data-testid="stTextArea"] textarea { background-color: #142014 !important; border: 1px solid #2a4a2a !important; border-radius: 8px !important; color: #e8f0e8 !important; }
-[data-testid="stTextInput"] input:focus, [data-testid="stTextArea"] textarea:focus { border-color: #F5C430 !important; box-shadow: 0 0 0 2px rgba(245,196,48,0.15) !important; }
-[data-testid="stDataFrame"] { border: 1px solid #1e3a1e; border-radius: 10px; overflow: hidden; }
-[data-testid="stForm"] { background: #142014; border: 1px solid #1e3a1e; border-radius: 12px; padding: 20px; }
-hr { border-color: #1e3a1e !important; }
-.stCaption, [data-testid="stCaptionContainer"] { color: #8aaa8a !important; }
-code { background: #1e3a1e !important; color: #F5C430 !important; border-radius: 4px; padding: 1px 6px; }
-::-webkit-scrollbar { width: 6px; height: 6px; }
+
+/* ── Tabs ─────────────────────────────────────────────────────────── */
+[data-testid="stTabs"] [data-testid="stTab"] {
+  color: #4a6a4a;
+  border-bottom: 2px solid transparent;
+  font-weight: 500;
+}
+[data-testid="stTabs"] [aria-selected="true"] {
+  color: #F5C430 !important;
+  border-bottom: 2px solid #F5C430 !important;
+}
+
+/* ── Inputs ───────────────────────────────────────────────────────── */
+[data-testid="stTextInput"] input,
+[data-testid="stNumberInput"] input,
+[data-testid="stTextArea"] textarea,
+[data-testid="stSelectbox"] > div > div {
+  background-color: #0f1f0f !important;
+  border: 1px solid #1a301a !important;
+  border-radius: 8px !important;
+  color: #e8f0e8 !important;
+}
+[data-testid="stTextInput"] input:focus,
+[data-testid="stTextArea"] textarea:focus {
+  border-color: rgba(245,196,48,0.5) !important;
+  box-shadow: 0 0 0 2px rgba(245,196,48,0.08) !important;
+}
+
+/* ── Misc ─────────────────────────────────────────────────────────── */
+[data-testid="stDataFrame"] { border: 1px solid #1a301a; border-radius: 10px; overflow: hidden; }
+[data-testid="stForm"] { background: #0f1f0f; border: 1px solid #1a301a; border-radius: 12px; padding: 20px; }
+hr { border-color: #1a301a !important; }
+.stCaption, [data-testid="stCaptionContainer"] { color: #4a6a4a !important; }
+code { background: #1a301a !important; color: #F5C430 !important; border-radius: 4px; padding: 1px 6px; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: #0A1A0A; }
-::-webkit-scrollbar-thumb { background: #2a4a2a; border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: #1a301a; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #F5C430; }
-[data-testid="stSidebar"] .stButton > button { background: transparent; border: 1px solid #2a4a2a; color: #8aaa8a; width: 100%; }
-[data-testid="stSidebar"] .stButton > button:hover { border-color: #F5C430; color: #F5C430; transform: none; }
+
+/* Alert / info boxes */
+[data-testid="stAlert"] { border-radius: 10px !important; border-left-width: 3px !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -63,31 +188,40 @@ if "is_admin" not in st.session_state:
         st.session_state["user_email"] = ""
 
 PAGES: dict[str, str] = {
-    "\U0001f4ca Dashboard":       "uusio.frontend.pages.dashboard",
-    "\U0001f3e2 My Portal":       "uusio.frontend.pages.portal",
-    "\U0001f4d6 Regulations":     "uusio.frontend.pages.regulations",
-    "\U0001f50c Data Sources":    "uusio.frontend.pages.data_sources",
-    "\U0001f4e6 Products":        "uusio.frontend.pages.products",
-    "\U0001f9ee Calculations":    "uusio.frontend.pages.calculations",
-    "\U0001f4e4 Submissions":     "uusio.frontend.pages.submissions",
+    "Dashboard":     "uusio.frontend.pages.dashboard",
+    "My Portal":     "uusio.frontend.pages.portal",
+    "Regulations":   "uusio.frontend.pages.regulations",
+    "Data Sources":  "uusio.frontend.pages.data_sources",
+    "Products":      "uusio.frontend.pages.products",
+    "Calculations":  "uusio.frontend.pages.calculations",
+    "Submissions":   "uusio.frontend.pages.submissions",
 }
 
 if st.session_state.get("is_admin"):
-    PAGES["\U0001f6e1️ Admin"]  = "uusio.frontend.pages.admin"
-    PAGES["\U0001f4b3 Billing"]   = "uusio.frontend.pages.billing"
+    PAGES["Admin"]   = "uusio.frontend.pages.admin"
+    PAGES["Billing"] = "uusio.frontend.pages.billing"
 
 with st.sidebar:
     st.markdown(
-        "<h1 style='margin-bottom:0;padding-bottom:0'>UusiO</h1>"
-        "<p style='color:#8aaa8a;font-size:0.72rem;margin-top:2px;letter-spacing:1.5px'>SIMPLIFYING EPR COMPLIANCE</p>",
+        "<h1 style='margin-bottom:0;padding-bottom:0;margin-top:8px'>Uusi<span style='color:#F5C430'>O</span></h1>"
+        "<p style='color:#3a5a3a;font-size:0.68rem;margin-top:4px;letter-spacing:1.8px;text-transform:uppercase'>Simplifying EPR Compliance</p>",
         unsafe_allow_html=True,
     )
+    st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
     if st.session_state.get("user_email"):
-        st.caption(f"\U0001f464 {st.session_state['user_email']}")
-    st.divider()
+        st.caption(st.session_state["user_email"])
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
     selection = st.radio("Navigate", list(PAGES.keys()), label_visibility="collapsed")
-    st.divider()
-    if st.button("Log out", use_container_width=True):
+    st.markdown("<div style='flex:1'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
+    if st.session_state.get("is_admin"):
+        st.markdown(
+            "<div style='font-size:0.65rem;color:#2a4a2a;text-transform:uppercase;"
+            "letter-spacing:1.2px;padding:0 14px;margin-bottom:4px'>Admin</div>",
+            unsafe_allow_html=True,
+        )
+    st.markdown("<div style='height:32px'></div>", unsafe_allow_html=True)
+    if st.button("Sign out", use_container_width=True):
         st.session_state.clear()
         st.rerun()
 
