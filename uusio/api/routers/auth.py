@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from uusio.api.dependencies import get_current_user
 from uusio.core.database import get_db
 from uusio.core.security import create_access_token, verify_password
 from uusio.models.user import User
@@ -37,3 +38,15 @@ async def login(
         )
     token = create_access_token(subject=str(user.id), customer_id=str(user.customer_id))
     return Token(access_token=token, token_type="bearer")
+
+
+@router.get("/me")
+async def get_me(current_user: Annotated[User, Depends(get_current_user)]):
+    return {
+        "id": str(current_user.id),
+        "email": current_user.email,
+        "full_name": current_user.full_name,
+        "is_admin": current_user.is_admin,
+        "is_active": current_user.is_active,
+        "customer_id": str(current_user.customer_id),
+    }
