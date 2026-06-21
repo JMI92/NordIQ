@@ -31,8 +31,20 @@ OBL_ICON = {
 SUB_ICON = {"success": "\U0001f7e2", "failed": "\U0001f534", "pending": "\U0001f7e1", "acknowledged": "\U0001f535"}
 
 
+def _heading(icon: str, text: str, size: str = "h2") -> None:
+    st.markdown(
+        f'<{size} style="display:flex;align-items:center;gap:10px;color:#e8f0e8;font-weight:600;margin-bottom:0.5rem">'
+        f'<span style="color:#F5C430;font-size:1.1em">{icon}</span>{text}</{size}>',
+        unsafe_allow_html=True,
+    )
+
+
 def render() -> None:
-    st.title("\U0001f4ca Dashboard")
+    st.markdown(
+        '<h1 style="color:#F5C430;font-weight:700;letter-spacing:-0.5px;margin-bottom:0.25rem">'
+        '<span style="margin-right:10px">◈</span>Dashboard</h1>',
+        unsafe_allow_html=True,
+    )
 
     # ── Summary metrics ──────────────────────────────────────────────────────
     summary: dict = {}
@@ -54,7 +66,7 @@ def render() -> None:
     st.divider()
 
     # ── Reporting calendar ───────────────────────────────────────────────────
-    st.subheader("\U0001f4c5 Reporting Calendar")
+    _heading("⬡", "Reporting Calendar")
 
     calendar: list = []
     try:
@@ -103,7 +115,7 @@ def render() -> None:
     col_left, col_right = st.columns(2)
 
     with col_left:
-        st.subheader("\U0001f5c4️ Active PRO Registrations")
+        _heading("◉", "Active PRO Registrations")
         try:
             regs = [r for r in api_client.my_registrations() if r["status"] == "active"]
             if not regs:
@@ -119,7 +131,7 @@ def render() -> None:
             st.info("Could not load PRO registrations.")
 
     with col_right:
-        st.subheader("\U0001f4c4 Recent Submissions")
+        _heading("◈", "Recent Submissions")
         try:
             reports = api_client.my_reports()[:6]
             if not reports:

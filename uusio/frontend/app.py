@@ -44,6 +44,10 @@ code { background: #1e3a1e !important; color: #F5C430 !important; border-radius:
 ::-webkit-scrollbar-thumb:hover { background: #F5C430; }
 [data-testid="stSidebar"] .stButton > button { background: transparent; border: 1px solid #2a4a2a; color: #8aaa8a; width: 100%; }
 [data-testid="stSidebar"] .stButton > button:hover { border-color: #F5C430; color: #F5C430; transform: none; }
+[data-testid="stSidebar"] [data-testid="stRadio"] label { color: #9ab89a !important; font-size: 0.9rem; letter-spacing: 0.2px; padding: 4px 0; transition: color 0.15s; }
+[data-testid="stSidebar"] [data-testid="stRadio"] label:hover { color: #F5C430 !important; }
+[data-testid="stSidebar"] [data-testid="stRadio"] [aria-checked="true"] + div label,
+[data-testid="stSidebar"] [data-testid="stRadio"] input:checked ~ label { color: #F5C430 !important; font-weight: 600; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -63,18 +67,18 @@ if "is_admin" not in st.session_state:
         st.session_state["user_email"] = ""
 
 PAGES: dict[str, str] = {
-    "\U0001f4ca Dashboard":       "uusio.frontend.pages.dashboard",
-    "\U0001f3e2 My Portal":       "uusio.frontend.pages.portal",
-    "\U0001f4d6 Regulations":     "uusio.frontend.pages.regulations",
-    "\U0001f50c Data Sources":    "uusio.frontend.pages.data_sources",
-    "\U0001f4e6 Products":        "uusio.frontend.pages.products",
-    "\U0001f9ee Calculations":    "uusio.frontend.pages.calculations",
-    "\U0001f4e4 Submissions":     "uusio.frontend.pages.submissions",
+    "◈  Dashboard":       "uusio.frontend.pages.dashboard",
+    "◉  My Portal":       "uusio.frontend.pages.portal",
+    "≡  Regulations":     "uusio.frontend.pages.regulations",
+    "⇌  Data Sources":    "uusio.frontend.pages.data_sources",
+    "⬡  Products":        "uusio.frontend.pages.products",
+    "∑  Calculations":    "uusio.frontend.pages.calculations",
+    "↑  Submissions":     "uusio.frontend.pages.submissions",
 }
 
 if st.session_state.get("is_admin"):
-    PAGES["\U0001f6e1️ Admin"]  = "uusio.frontend.pages.admin"
-    PAGES["\U0001f4b3 Billing"]   = "uusio.frontend.pages.billing"
+    PAGES["⊞  Admin"]   = "uusio.frontend.pages.admin"
+    PAGES["◧  Billing"] = "uusio.frontend.pages.billing"
 
 with st.sidebar:
     st.markdown(
