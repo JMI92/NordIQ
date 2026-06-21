@@ -4,7 +4,7 @@ set -e
 
 echo "[entrypoint] Starting Streamlit frontend…"
 export PYTHONPATH=/app:${PYTHONPATH}
-exec streamlit run nordiq/frontend/app.py \
+exec streamlit run uusio/frontend/app.py \
     --server.port 8501 \
     --server.address 0.0.0.0 \
     --server.headless true \

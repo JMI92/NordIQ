@@ -17,8 +17,8 @@ COPY . .
 
 RUN chmod +x scripts/entrypoint-frontend.sh \
     && adduser --disabled-password --gecos "" nordiq \
-    && mkdir -p /tmp/nordiq_reports \
-    && chown -R nordiq:nordiq /app /tmp/nordiq_reports
+    && mkdir -p /tmp/uusio_reports \
+    && chown -R nordiq:nordiq /app /tmp/uusio_reports
 
 USER nordiq
 
