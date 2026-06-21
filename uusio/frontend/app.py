@@ -4,232 +4,54 @@ import streamlit as st
 
 st.set_page_config(
     page_title="Uusio — EPR Compliance",
-    page_icon="https://i.imgur.com/placeholder.png",
+    page_icon="♻️",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# ---------------------------------------------------------------------------
-# Brand CSS — matches uusio.io visual identity
-# ---------------------------------------------------------------------------
 st.markdown("""
 <style>
-/* ---- Google Font ---- */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
-html, body, [class*="css"] {
-    font-family: 'Inter', sans-serif;
-}
-
-/* ---- Main background ---- */
-.stApp {
-    background-color: #0A1A0A;
-}
-
-/* ---- Sidebar ---- */
-[data-testid="stSidebar"] {
-    background-color: #0d1f0d;
-    border-right: 1px solid #1e3a1e;
-}
-[data-testid="stSidebar"] .stMarkdown p,
-[data-testid="stSidebar"] label,
-[data-testid="stSidebar"] .stRadio label {
-    color: #d4e8d4 !important;
-}
-
-/* ---- Sidebar logo title ---- */
-[data-testid="stSidebar"] h1 {
-    color: #F5C430 !important;
-    font-size: 1.6rem !important;
-    font-weight: 700 !important;
-    letter-spacing: -0.5px;
-}
-
-/* ---- Sidebar radio (nav) ---- */
-[data-testid="stSidebar"] [data-testid="stRadio"] > div {
-    gap: 2px;
-}
-[data-testid="stSidebar"] [data-testid="stRadio"] label {
-    border-radius: 8px;
-    padding: 6px 10px;
-    transition: background 0.15s;
-}
-[data-testid="stSidebar"] [data-testid="stRadio"] label:hover {
-    background: rgba(245,196,48,0.1);
-}
-[data-testid="stSidebar"] [data-testid="stRadio"] label[data-baseweb="radio"] input:checked + div {
-    color: #F5C430;
-}
-
-/* ---- Page headings ---- */
+html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+.stApp { background-color: #0A1A0A; }
+[data-testid="stSidebar"] { background-color: #0d1f0d; border-right: 1px solid #1e3a1e; }
+[data-testid="stSidebar"] .stMarkdown p, [data-testid="stSidebar"] label { color: #d4e8d4 !important; }
+[data-testid="stSidebar"] h1 { color: #F5C430 !important; font-size: 1.6rem !important; font-weight: 700 !important; letter-spacing: -0.5px; }
 h1 { color: #F5C430 !important; font-weight: 700; letter-spacing: -0.5px; }
 h2 { color: #e8f0e8 !important; font-weight: 600; }
 h3 { color: #c8dcc8 !important; font-weight: 600; }
-
-/* ---- Metric cards ---- */
-[data-testid="stMetric"] {
-    background: #142014;
-    border: 1px solid #1e3a1e;
-    border-radius: 12px;
-    padding: 16px 20px;
-}
-[data-testid="stMetricLabel"] { color: #8aaa8a !important; font-size: 0.8rem !important; text-transform: uppercase; letter-spacing: 0.5px; }
+[data-testid="stMetric"] { background: #142014; border: 1px solid #1e3a1e; border-radius: 12px; padding: 16px 20px; }
+[data-testid="stMetricLabel"] { color: #8aaa8a !important; font-size: 0.78rem !important; text-transform: uppercase; letter-spacing: 0.5px; }
 [data-testid="stMetricValue"] { color: #F5C430 !important; font-weight: 700; }
-
-/* ---- Buttons ---- */
-.stButton > button {
-    background-color: #F5C430;
-    color: #0A1A0A;
-    border: none;
-    border-radius: 8px;
-    font-weight: 600;
-    transition: background 0.2s, transform 0.1s;
-}
-.stButton > button:hover {
-    background-color: #f0b800;
-    transform: translateY(-1px);
-}
-.stButton > button[kind="secondary"] {
-    background-color: transparent;
-    border: 1px solid #F5C430;
-    color: #F5C430;
-}
-.stButton > button[kind="secondary"]:hover {
-    background-color: rgba(245,196,48,0.1);
-}
-
-/* ---- Primary button ---- */
-.stButton > button[data-testid="baseButton-primary"] {
-    background-color: #F5C430;
-    color: #0A1A0A;
-    font-weight: 700;
-    padding: 10px 24px;
-}
-
-/* ---- Dataframes / tables ---- */
-[data-testid="stDataFrame"] {
-    border: 1px solid #1e3a1e;
-    border-radius: 10px;
-    overflow: hidden;
-}
-
-/* ---- Expanders ---- */
-[data-testid="stExpander"] {
-    background: #142014;
-    border: 1px solid #1e3a1e;
-    border-radius: 10px;
-    margin-bottom: 6px;
-}
-[data-testid="stExpander"] summary {
-    color: #e8f0e8;
-    font-weight: 500;
-}
-[data-testid="stExpander"] summary:hover {
-    color: #F5C430;
-}
-
-/* ---- Tabs ---- */
-[data-testid="stTabs"] [data-testid="stTab"] {
-    color: #8aaa8a;
-    border-bottom: 2px solid transparent;
-}
-[data-testid="stTabs"] [aria-selected="true"] {
-    color: #F5C430 !important;
-    border-bottom: 2px solid #F5C430 !important;
-}
-
-/* ---- Inputs ---- */
-[data-testid="stTextInput"] input,
-[data-testid="stNumberInput"] input,
-[data-testid="stTextArea"] textarea,
-[data-testid="stSelectbox"] > div {
-    background-color: #142014 !important;
-    border: 1px solid #2a4a2a !important;
-    border-radius: 8px !important;
-    color: #e8f0e8 !important;
-}
-[data-testid="stTextInput"] input:focus,
-[data-testid="stTextArea"] textarea:focus {
-    border-color: #F5C430 !important;
-    box-shadow: 0 0 0 2px rgba(245,196,48,0.15) !important;
-}
-
-/* ---- Info / warning / success / error boxes ---- */
-[data-testid="stAlert"] {
-    border-radius: 8px;
-    border-left-width: 4px;
-}
-
-/* ---- Divider ---- */
+.stButton > button { background-color: #F5C430; color: #0A1A0A; border: none; border-radius: 8px; font-weight: 600; transition: background 0.2s, transform 0.1s; }
+.stButton > button:hover { background-color: #f0b800; transform: translateY(-1px); }
+.stButton > button[kind="secondary"] { background-color: transparent; border: 1px solid #F5C430; color: #F5C430; }
+[data-testid="stExpander"] { background: #142014; border: 1px solid #1e3a1e; border-radius: 10px; margin-bottom: 6px; }
+[data-testid="stExpander"] summary { color: #e8f0e8; font-weight: 500; }
+[data-testid="stExpander"] summary:hover { color: #F5C430; }
+[data-testid="stTabs"] [data-testid="stTab"] { color: #8aaa8a; border-bottom: 2px solid transparent; }
+[data-testid="stTabs"] [aria-selected="true"] { color: #F5C430 !important; border-bottom: 2px solid #F5C430 !important; }
+[data-testid="stTextInput"] input, [data-testid="stNumberInput"] input, [data-testid="stTextArea"] textarea { background-color: #142014 !important; border: 1px solid #2a4a2a !important; border-radius: 8px !important; color: #e8f0e8 !important; }
+[data-testid="stTextInput"] input:focus, [data-testid="stTextArea"] textarea:focus { border-color: #F5C430 !important; box-shadow: 0 0 0 2px rgba(245,196,48,0.15) !important; }
+[data-testid="stDataFrame"] { border: 1px solid #1e3a1e; border-radius: 10px; overflow: hidden; }
+[data-testid="stForm"] { background: #142014; border: 1px solid #1e3a1e; border-radius: 12px; padding: 20px; }
 hr { border-color: #1e3a1e !important; }
-
-/* ---- Sidebar logout button ---- */
-[data-testid="stSidebar"] .stButton > button {
-    background: transparent;
-    border: 1px solid #2a4a2a;
-    color: #8aaa8a;
-    width: 100%;
-}
-[data-testid="stSidebar"] .stButton > button:hover {
-    border-color: #F5C430;
-    color: #F5C430;
-    transform: none;
-}
-
-/* ---- Scrollbar ---- */
+.stCaption, [data-testid="stCaptionContainer"] { color: #8aaa8a !important; }
+code { background: #1e3a1e !important; color: #F5C430 !important; border-radius: 4px; padding: 1px 6px; }
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: #0A1A0A; }
 ::-webkit-scrollbar-thumb { background: #2a4a2a; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #F5C430; }
-
-/* ---- Caption / small text ---- */
-.stCaption, [data-testid="stCaptionContainer"] {
-    color: #8aaa8a !important;
-}
-
-/* ---- Badges/code ---- */
-code {
-    background: #1e3a1e !important;
-    color: #F5C430 !important;
-    border-radius: 4px;
-    padding: 1px 6px;
-}
-
-/* ---- Forms ---- */
-[data-testid="stForm"] {
-    background: #142014;
-    border: 1px solid #1e3a1e;
-    border-radius: 12px;
-    padding: 20px;
-}
-
-/* ---- Toggle ---- */
-[data-testid="stToggle"] [data-checked="true"] {
-    background-color: #F5C430 !important;
-}
-
-/* ---- Link buttons ---- */
-a[data-testid="baseLinkButton-secondary"] {
-    background: #F5C430;
-    color: #0A1A0A !important;
-    border-radius: 8px;
-    font-weight: 600;
-    text-decoration: none;
-    padding: 8px 16px;
-}
+[data-testid="stSidebar"] .stButton > button { background: transparent; border: 1px solid #2a4a2a; color: #8aaa8a; width: 100%; }
+[data-testid="stSidebar"] .stButton > button:hover { border-color: #F5C430; color: #F5C430; transform: none; }
 </style>
 """, unsafe_allow_html=True)
-
-# ---------------------------------------------------------------------------
-# Auth gate
-# ---------------------------------------------------------------------------
 
 if "token" not in st.session_state:
     from uusio.frontend.pages.login import render_login
     render_login()
     st.stop()
 
-# Fetch current user info once per session
 if "is_admin" not in st.session_state:
     from uusio.frontend import api_client
     try:
@@ -240,28 +62,24 @@ if "is_admin" not in st.session_state:
         st.session_state["is_admin"] = False
         st.session_state["user_email"] = ""
 
-# ---------------------------------------------------------------------------
-# Navigation
-# ---------------------------------------------------------------------------
-
 PAGES: dict[str, str] = {
-    "\U0001f4ca Dashboard":        "uusio.frontend.pages.dashboard",
-    "\U0001f3e2 Oma portaali":     "uusio.frontend.pages.portal",
-    "\U0001f4d6 Säännöskirjasto": "uusio.frontend.pages.regulations",
-    "\U0001f50c Data Sources":     "uusio.frontend.pages.data_sources",
-    "\U0001f4e6 Tuotteet":         "uusio.frontend.pages.products",
-    "\U0001f9ee Calculations":     "uusio.frontend.pages.calculations",
-    "\U0001f4e4 Submissions":      "uusio.frontend.pages.submissions",
+    "\U0001f4ca Dashboard":       "uusio.frontend.pages.dashboard",
+    "\U0001f3e2 My Portal":       "uusio.frontend.pages.portal",
+    "\U0001f4d6 Regulations":     "uusio.frontend.pages.regulations",
+    "\U0001f50c Data Sources":    "uusio.frontend.pages.data_sources",
+    "\U0001f4e6 Products":        "uusio.frontend.pages.products",
+    "\U0001f9ee Calculations":    "uusio.frontend.pages.calculations",
+    "\U0001f4e4 Submissions":     "uusio.frontend.pages.submissions",
 }
 
 if st.session_state.get("is_admin"):
     PAGES["\U0001f6e1️ Admin"]  = "uusio.frontend.pages.admin"
-    PAGES["\U0001f4b3 Billing"]    = "uusio.frontend.pages.billing"
+    PAGES["\U0001f4b3 Billing"]   = "uusio.frontend.pages.billing"
 
 with st.sidebar:
     st.markdown(
         "<h1 style='margin-bottom:0;padding-bottom:0'>UusiO</h1>"
-        "<p style='color:#8aaa8a;font-size:0.75rem;margin-top:2px;letter-spacing:1px'>SIMPLIFYING EPR COMPLIANCE</p>",
+        "<p style='color:#8aaa8a;font-size:0.72rem;margin-top:2px;letter-spacing:1.5px'>SIMPLIFYING EPR COMPLIANCE</p>",
         unsafe_allow_html=True,
     )
     if st.session_state.get("user_email"):
@@ -269,14 +87,10 @@ with st.sidebar:
     st.divider()
     selection = st.radio("Navigate", list(PAGES.keys()), label_visibility="collapsed")
     st.divider()
-    if st.button("Kirjaudu ulos", use_container_width=True):
+    if st.button("Log out", use_container_width=True):
         st.session_state.clear()
         st.rerun()
 
-# ---------------------------------------------------------------------------
-# Render selected page
-# ---------------------------------------------------------------------------
 import importlib  # noqa: E402
-
 module = importlib.import_module(PAGES[selection])
 module.render()

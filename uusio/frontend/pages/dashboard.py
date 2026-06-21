@@ -1,9 +1,8 @@
-"""Raportointikaienteri + yhteenveto — asiakkaan päänäkymä."""
+"""Dashboard — reporting calendar + compliance overview."""
 
 from __future__ import annotations
 
 import streamlit as st
-
 from uusio.frontend import api_client
 
 FLAGS = {
@@ -12,128 +11,126 @@ FLAGS = {
     "DE": "\U0001f1e9\U0001f1ea", "FR": "\U0001f1eb\U0001f1f7",
     "NL": "\U0001f1f3\U0001f1f1", "BE": "\U0001f1e7\U0001f1ea",
     "PL": "\U0001f1f5\U0001f1f1", "EU": "\U0001f1ea\U0001f1fa",
+    "AT": "\U0001f1e6\U0001f1f9", "ES": "\U0001f1ea\U0001f1f8",
+    "IT": "\U0001f1ee\U0001f1f9",
 }
 
-URGENCY_CONFIG = {
-    "critical": ("\U0001f534", "error"),
-    "warning":  ("\U0001f7e1", "warning"),
-    "ok":       ("\U0001f7e2", "success"),
+URGENCY = {
+    "critical": ("\U0001f534", "#3a0a0a", "#ff4444"),
+    "warning":  ("\U0001f7e1", "#2a2200", "#F5C430"),
+    "ok":       ("\U0001f7e2", "#0a2a0a", "#4caf50"),
 }
 
-OBL_STATUS_ICON = {
-    "draft":     "\U0001f4dd",
-    "finalised": "\U0001f512",
-    "submitted": "\U00002705",
-    None:        "⚪",
+OBL_ICON = {
+    "draft":     ("\U0001f4dd", "Draft"),
+    "finalised": ("\U0001f512", "Finalised"),
+    "submitted": ("\U00002705", "Submitted"),
+    None:        ("⚪", "Not calculated"),
 }
+
+SUB_ICON = {"success": "\U0001f7e2", "failed": "\U0001f534", "pending": "\U0001f7e1", "acknowledged": "\U0001f535"}
 
 
 def render() -> None:
     st.title("\U0001f4ca Dashboard")
 
-    # ---------- Summary metrics ----------
+    # ── Summary metrics ──────────────────────────────────────────────────────
     summary: dict = {}
     try:
         summary = api_client.portal_summary()
-    except api_client.APIError as e:
-        if e.status_code != 404:
-            st.warning(f"Yhteenvetoa ei saatu: {e.detail}")
-    except Exception as e:
-        st.warning(f"Yhteenvetoa ei saatu: {e}")
+    except Exception:
+        pass
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Aktiiviset PRO:t", summary.get("active_pro_count", 0))
-    c2.metric("Maat", len(summary.get("active_countries", [])))
-    c3.metric("Velvoitteet", summary.get("total_obligations", 0))
-    c4.metric("Onnist. lähetykset", summary.get("successful_submissions", 0))
+    c1.metric("Active PROs",        summary.get("active_pro_count", 0))
+    c2.metric("Countries covered",  len(summary.get("active_countries", [])))
+    c3.metric("Total obligations",  summary.get("total_obligations", 0))
+    c4.metric("Successful reports", summary.get("successful_submissions", 0))
 
     if summary.get("active_countries"):
-        flags = " ".join(FLAGS.get(c, c) for c in summary["active_countries"])
-        st.caption(f"Aktiiviset maat: {flags}")
+        flags = "  ".join(FLAGS.get(c, c) for c in summary["active_countries"])
+        st.caption(f"Active markets: {flags}")
 
     st.divider()
 
-    # ---------- Reporting calendar ----------
-    st.subheader("\U0001f4c5 Raportointiaikataulu")
+    # ── Reporting calendar ───────────────────────────────────────────────────
+    st.subheader("\U0001f4c5 Reporting Calendar")
+
     calendar: list = []
     try:
         calendar = api_client.reporting_calendar()
-    except api_client.APIError as e:
-        if e.status_code != 404:
-            st.warning(f"Kalenteria ei saatu: {e.detail}")
-    except Exception as e:
-        st.warning(f"Kalenteria ei saatu: {e}")
+    except Exception:
+        pass
 
     if not calendar:
         st.info(
-            "Ei tulevia raportointipäiväyksiä. "
-            "Varmista että PRO-rekisteröinnit on lisätty Admin-osiossa "
-            "ja reporting deadlines on määritetty."
+            "No upcoming reporting deadlines. "
+            "Add PRO registrations in the Admin panel and ensure Reporting Deadlines are configured."
         )
     else:
         for item in calendar:
             urgency = item.get("urgency", "ok")
-            icon, _ = URGENCY_CONFIG.get(urgency, ("\U0001f7e2", "success"))
+            icon, bg, border = URGENCY.get(urgency, URGENCY["ok"])
             country = item["country_code"]
             flag = FLAGS.get(country, "\U0001f310")
             days = item["days_until_deadline"]
             obl_status = item.get("obligation_status")
-            obl_icon = OBL_STATUS_ICON.get(obl_status, OBL_STATUS_ICON[None])
-            days_label = f"{days} pv" if days > 0 else "TÄNÄÄN"
-            title = f"{icon} {flag} **{item['pro_name']}** — {item['product_category']} — deadline {item['submission_deadline']} ({days_label})"
+            obl_icon, obl_label = OBL_ICON.get(obl_status, OBL_ICON[None])
+            days_label = "TODAY" if days == 0 else (f"{days}d" if days > 0 else "OVERDUE")
 
+            title = f"{icon} {flag} **{item['pro_name']}** — {item['product_category']} — due {item['submission_deadline']} ({days_label})"
             with st.expander(title, expanded=(urgency == "critical")):
                 col1, col2, col3 = st.columns(3)
-                col1.markdown(f"**Raportointijakso**  \n{item['reporting_period_start']} – {item['reporting_period_end']}")
-                col2.markdown(f"**Velvoite**  \n{obl_icon} {obl_status or 'ei laskettu'}")
-                col3.markdown(f"**Deadline**  \n{item['submission_deadline']}")
+                col1.markdown(f"**Reporting period**  \n{item['reporting_period_start']} – {item['reporting_period_end']}")
+                col2.markdown(f"**Obligation status**  \n{obl_icon} {obl_label}")
+                col3.markdown(f"**Deadline**  \n`{item['submission_deadline']}`")
                 if item.get("pro_portal_url"):
-                    st.markdown(f"[Avaa PRO-portaali ↗]({item['pro_portal_url']})")
+                    st.markdown(f"[Open PRO portal ↗]({item['pro_portal_url']})")
                 if item.get("notes"):
                     st.caption(item["notes"])
                 if obl_status is None:
-                    st.warning("⚠️ Velvoitetta ei ole vielä laskettu.")
+                    st.warning("Obligation not yet calculated for this period. Go to **Calculations**.")
                 elif obl_status == "draft":
-                    st.warning("📝 Luonnos — viimeistele ennen lähettämistä.")
+                    st.warning("Draft obligation — finalise before submitting.")
                 elif obl_status == "finalised":
-                    st.info("🔒 Viimeistelty — valmis lähetettäväksi.")
+                    st.info("Obligation finalised — ready to submit.")
                 elif obl_status == "submitted":
-                    st.success("✅ Lähetetty!")
+                    st.success("Submitted!")
 
     st.divider()
 
-    # ---------- Active PROs + recent submissions ----------
+    # ── Active PROs + Recent submissions ─────────────────────────────────────
     col_left, col_right = st.columns(2)
 
     with col_left:
-        st.subheader("\U0001f5c4️ Aktiiviset PRO:t")
+        st.subheader("\U0001f5c4️ Active PRO Registrations")
         try:
-            regs = api_client.my_registrations()
-            active = [r for r in regs if r["status"] == "active"]
-            if not active:
-                st.info("Ei aktiivisia PRO-rekisteröintejä.")
+            regs = [r for r in api_client.my_registrations() if r["status"] == "active"]
+            if not regs:
+                st.info("No active PRO registrations.")
             else:
-                for r in active:
+                for r in regs:
                     pro = r.get("pro") or {}
                     country = pro.get("country_code", "")
                     flag = FLAGS.get(country, "\U0001f310")
-                    reg_num = f" `{r['registration_number']}`" if r.get("registration_number") else ""
+                    reg_num = f"  `{r['registration_number']}`" if r.get("registration_number") else ""
                     st.markdown(f"{flag} **{pro.get('name', '?')}** — {pro.get('category', '')}{reg_num}")
         except Exception:
-            st.info("PRO-rekisteröintejä ei saatu.")
+            st.info("Could not load PRO registrations.")
 
     with col_right:
-        st.subheader("\U0001f4c4 Viimeisimmät lähetykset")
+        st.subheader("\U0001f4c4 Recent Submissions")
         try:
-            reports = api_client.my_reports()[:5]
+            reports = api_client.my_reports()[:6]
             if not reports:
-                st.info("Ei lähetyksiä vielä.")
+                st.info("No submissions yet.")
             else:
                 for r in reports:
                     obl = r.get("obligation") or {}
-                    status_icon = {"success": "\U0001f7e2", "failed": "\U0001f534", "pending": "\U0001f7e1"}.get(r["status"], "⚪")
+                    s_icon = SUB_ICON.get(r["status"], "⚪")
                     country = obl.get("country_code", "")
                     flag = FLAGS.get(country, "")
-                    st.markdown(f"{status_icon} {flag} {r['pro_id']} — {r['submitted_at'][:10]}")
+                    period = obl.get("period_start", "")[:7] if obl.get("period_start") else ""
+                    st.markdown(f"{s_icon} {flag} {r['pro_id']}  —  {period}  —  {r['submitted_at'][:10]}")
         except Exception:
-            st.info("Lähetyksiä ei saatu.")
+            st.info("Could not load submissions.")
