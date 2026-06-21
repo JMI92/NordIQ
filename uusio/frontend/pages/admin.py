@@ -4,6 +4,9 @@ import streamlit as st
 
 from uusio.frontend import api_client
 
+ACTIVE_ICON = "\U0001f7e2"
+INACTIVE_ICON = "\U0001f534"
+
 
 def render() -> None:
     st.title("\U0001f6e1️ Admin")
@@ -73,8 +76,11 @@ def render() -> None:
                 except Exception:
                     users = []
                 for u in users:
-                    with st.expander(f"{u['email']} {'\U0001f7e2' if u['is_active'] else '\U0001f534'}"):
+                    status_icon = ACTIVE_ICON if u["is_active"] else INACTIVE_ICON
+                    with st.expander(f"{u['email']} {status_icon}"):
                         st.markdown(f"**Nimi:** {u['full_name']}")
+                        admin_label = "Kyllä" if u["is_admin"] else "Ei"
+                        st.markdown(f"**Admin:** {admin_label}")
                         if st.button("Reset salasana", key=f"reset_{u['id']}"):
                             result = api_client.admin_reset_password(u["id"])
                             st.success(f"⚠️ Väliaikainen salasana: `{result['temporary_password']}`")
@@ -91,7 +97,11 @@ def render() -> None:
 
     # ============================================================ PRO Registry
     with tab_pros:
-        pros = api_client.list_pros(active_only=False)
+        try:
+            pros = api_client.list_pros(active_only=False)
+        except Exception as e:
+            st.error(str(e))
+            pros = []
 
         if pros:
             import pandas as pd
@@ -111,7 +121,7 @@ def render() -> None:
         with st.form("new_pro_form"):
             p1, p2, p3 = st.columns(3)
             name = p1.text_input("Nimi *")
-            country = p2.text_input("Maakoodi (FI, SE...)  *")
+            country = p2.text_input("Maakoodi (FI, SE...) *")
             category = p3.selectbox("Kategoria *", ["Packaging", "Electronics", "Batteries", "Textiles", "Tyres", "Other"])
             pro_key = st.text_input("Avain (uniikki, esim. rinki-fi) *")
             q1, q2 = st.columns(2)
@@ -129,18 +139,21 @@ def render() -> None:
             if not name or not country or not pro_key:
                 st.error("Nimi, maakoodi ja avain ovat pakollisia.")
             else:
-                api_client.create_pro({
-                    "name": name, "country_code": country, "category": category,
-                    "pro_key": pro_key, "website": website or None,
-                    "portal_url": portal_url or None,
-                    "contact_name": contact_name or None,
-                    "contact_email": contact_email or None,
-                    "contact_phone": contact_phone or None,
-                    "reporting_deadline_notes": deadline_notes or None,
-                    "notes": notes or None,
-                })
-                st.success(f"PRO {name} lisätty.")
-                st.rerun()
+                try:
+                    api_client.create_pro({
+                        "name": name, "country_code": country, "category": category,
+                        "pro_key": pro_key, "website": website or None,
+                        "portal_url": portal_url or None,
+                        "contact_name": contact_name or None,
+                        "contact_email": contact_email or None,
+                        "contact_phone": contact_phone or None,
+                        "reporting_deadline_notes": deadline_notes or None,
+                        "notes": notes or None,
+                    })
+                    st.success(f"PRO {name} lisätty.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(str(e))
 
     # ======================================================= PRO Registrations
     with tab_registrations:
@@ -149,6 +162,10 @@ def render() -> None:
             pros = api_client.list_pros(active_only=False)
         except Exception as e:
             st.error(str(e))
+            return
+
+        if not customers:
+            st.info("Ei asiakkaita.")
             return
 
         cust_map = {c["name"]: c for c in customers}
@@ -162,14 +179,17 @@ def render() -> None:
 
         if regs:
             for reg in regs:
-                pro_name = reg.get("pro", {}).get("name", reg["pro_id"])
-                country = reg.get("pro", {}).get("country_code", "")
+                pro_name = (reg.get("pro") or {}).get("name", reg["pro_id"])
+                country = (reg.get("pro") or {}).get("country_code", "")
                 with st.expander(f"{country} — {pro_name} [{reg['status']}]"):
                     st.markdown(f"**Jäsennumero:** {reg.get('registration_number') or '(ei asetettu)'}")
-                    st.markdown(f"**Sopimus:** {reg.get('contract_start','')} – {reg.get('contract_end','')}")
-                    new_status = st.selectbox("Status", ["active", "pending", "expired", "suspended"],
-                                              index=["active", "pending", "expired", "suspended"].index(reg["status"]),
-                                              key=f"reg_status_{reg['id']}")
+                    st.markdown(f"**Sopimus:** {reg.get('contract_start', '')} – {reg.get('contract_end', '')}")
+                    new_status = st.selectbox(
+                        "Status",
+                        ["active", "pending", "expired", "suspended"],
+                        index=["active", "pending", "expired", "suspended"].index(reg["status"]),
+                        key=f"reg_status_{reg['id']}",
+                    )
                     if st.button("Päivitä status", key=f"upd_reg_{reg['id']}"):
                         api_client.update_registration(reg["id"], {"status": new_status})
                         st.rerun()
@@ -181,25 +201,31 @@ def render() -> None:
 
         st.divider()
         st.subheader("Lisää rekisteröinti")
-        pro_map = {f"{p['name']} ({p['country_code']})": p for p in pros}
-        with st.form("add_reg_form"):
-            sel_pro_label = st.selectbox("PRO", list(pro_map.keys()))
-            reg_num = st.text_input("Jäsennumero")
-            r1, r2 = st.columns(2)
-            c_start = r1.date_input("Sopimus alkaen", value=None)
-            c_end = r2.date_input("Sopimus päättyy", value=None)
-            reg_notes = st.text_area("Muistiinpanot")
-            reg_submitted = st.form_submit_button("Lisää")
+        if not pros:
+            st.info("Lisää ensin PRO:t PRO-rekisteri-välilehdellä.")
+        else:
+            pro_map = {f"{p['name']} ({p['country_code']})": p for p in pros}
+            with st.form("add_reg_form"):
+                sel_pro_label = st.selectbox("PRO", list(pro_map.keys()))
+                reg_num = st.text_input("Jäsennumero")
+                r1, r2 = st.columns(2)
+                c_start = r1.date_input("Sopimus alkaen", value=None)
+                c_end = r2.date_input("Sopimus päättyy", value=None)
+                reg_notes = st.text_area("Muistiinpanot")
+                reg_submitted = st.form_submit_button("Lisää")
 
-        if reg_submitted:
-            sel_pro = pro_map[sel_pro_label]
-            api_client.create_registration({
-                "customer_id": sel_cust["id"],
-                "pro_id": sel_pro["id"],
-                "registration_number": reg_num or None,
-                "contract_start": c_start.isoformat() if c_start else None,
-                "contract_end": c_end.isoformat() if c_end else None,
-                "notes": reg_notes or None,
-            })
-            st.success("Rekisteröinti lisätty.")
-            st.rerun()
+            if reg_submitted:
+                sel_pro = pro_map[sel_pro_label]
+                try:
+                    api_client.create_registration({
+                        "customer_id": sel_cust["id"],
+                        "pro_id": sel_pro["id"],
+                        "registration_number": reg_num or None,
+                        "contract_start": c_start.isoformat() if c_start else None,
+                        "contract_end": c_end.isoformat() if c_end else None,
+                        "notes": reg_notes or None,
+                    })
+                    st.success("Rekisteröinti lisätty.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(str(e))
