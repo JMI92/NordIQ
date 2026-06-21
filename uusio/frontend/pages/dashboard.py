@@ -1,4 +1,4 @@
-"""Dashboard page — high-level EPR compliance overview."""
+"""Raportointikaienteri + tuoteportaali — asiakkaan päänäkymä."""
 
 from __future__ import annotations
 
@@ -6,174 +6,128 @@ import streamlit as st
 
 from uusio.frontend import api_client
 
-STATUS_COLOUR = {
-    "draft": "🟡",
-    "finalised": "🟢",
-    "submitted": "🔵",
+FLAGS = {
+    "FI": "\U0001f1eb\U0001f1ee", "SE": "\U0001f1f8\U0001f1ea",
+    "NO": "\U0001f1f3\U0001f1f4", "DK": "\U0001f1e9\U0001f1f0",
+    "DE": "\U0001f1e9\U0001f1ea", "FR": "\U0001f1eb\U0001f1f7",
+    "NL": "\U0001f1f3\U0001f1f1", "BE": "\U0001f1e7\U0001f1ea",
+    "PL": "\U0001f1f5\U0001f1f1", "EU": "\U0001f1ea\U0001f1fa",
 }
 
-SUB_STATUS_COLOUR = {
-    "pending": "🟡",
-    "success": "🟢",
-    "failed": "🔴",
-    "acknowledged": "🔵",
+URGENCY_CONFIG = {
+    "critical": ("\U0001f534", "error"),
+    "warning":  ("\U0001f7e1", "warning"),
+    "ok":       ("\U0001f7e2", "success"),
+}
+
+OBL_STATUS_ICON = {
+    "draft":     "\U0001f4dd",
+    "finalised": "\U0001f512",
+    "submitted": "\U00002705",
+    None:        "⚪",
 }
 
 
 def render() -> None:
-    st.title("📊 Dashboard")
-    st.caption("Your EPR compliance overview at a glance.")
+    st.title("\U0001f4ca Dashboard")
 
-    obligations = api_client.list_obligations()
-    submissions = api_client.list_submissions()
-    products = api_client.list_products(limit=1000)
+    # ---------- Summary metrics ----------
+    try:
+        summary = api_client.portal_summary()
+    except Exception:
+        summary = {}
 
-    _render_kpi_row(obligations, submissions, products)
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Aktiiviset PRO:t", summary.get("active_pro_count", 0))
+    c2.metric("Maat", len(summary.get("active_countries", [])))
+    c3.metric("Velvoitteet", summary.get("total_obligations", 0))
+    c4.metric("Onnist. lähetykset", summary.get("successful_submissions", 0))
+
+    if summary.get("active_countries"):
+        flags = " ".join(FLAGS.get(c, c) for c in summary["active_countries"])
+        st.caption(f"Aktiiviset maat: {flags}")
+
     st.divider()
 
-    col_left, col_right = st.columns(2)
-    with col_left:
-        _render_obligations_summary(obligations)
-    with col_right:
-        _render_recent_submissions(submissions)
+    # ---------- Reporting calendar ----------
+    st.subheader("\U0001f4c5 Raportointiaikataulu")
+    try:
+        calendar = api_client.reporting_calendar()
+    except Exception as e:
+        st.warning(f"Kalenteria ei saatu: {e}")
+        calendar = []
 
-    st.divider()
-    _render_compliance_checklist(obligations)
-
-
-def _render_kpi_row(
-    obligations: list[dict],
-    submissions: list[dict],
-    products: list[dict],
-) -> None:
-    draft = sum(1 for o in obligations if o["status"] == "draft")
-    finalised = sum(1 for o in obligations if o["status"] == "finalised")
-    submitted = sum(1 for o in obligations if o["status"] == "submitted")
-    pending_subs = sum(1 for s in submissions if s["status"] == "pending")
-    failed_subs = sum(1 for s in submissions if s["status"] == "failed")
-
-    col1, col2, col3, col4, col5 = st.columns(5)
-    with col1:
-        st.metric("📦 Products", len(products))
-    with col2:
-        st.metric("🟡 Draft obligations", draft)
-    with col3:
-        st.metric("🟢 Finalised", finalised)
-    with col4:
-        st.metric("🔵 Submitted", submitted)
-    with col5:
-        st.metric(
-            "⚠️ Action needed",
-            finalised + pending_subs + failed_subs,
-            help="Finalised obligations awaiting submission + pending/failed submission attempts",
-        )
-
-
-def _render_obligations_summary(obligations: list[dict]) -> None:
-    st.subheader("Obligations")
-
-    if not obligations:
-        st.info("No obligations yet. Go to **Calculations** to create one.")
-        return
-
-    import pandas as pd  # noqa: PLC0415
-
-    rows = []
-    for ob in obligations:
-        icon = STATUS_COLOUR.get(ob["status"], "⚪")
-        rows.append({
-            "": icon,
-            "Country": ob["country_code"],
-            "Category": ob["product_category"],
-            "Period": f"{ob['period_start']} → {ob['period_end']}",
-            "Fee": f"{float(ob['fee_amount']):,.4f} {ob['currency']}",
-            "Status": ob["status"],
-        })
-
-    df = pd.DataFrame(rows)
-    st.dataframe(df, use_container_width=True, hide_index=True)
-
-    needs_submission = [o for o in obligations if o["status"] == "finalised"]
-    if needs_submission:
-        st.warning(
-            f"{len(needs_submission)} finalised obligation(s) awaiting submission. "
-            "Go to **Submissions** to submit."
-        )
-
-
-def _render_recent_submissions(submissions: list[dict]) -> None:
-    st.subheader("Recent submissions")
-
-    if not submissions:
-        st.info("No submission attempts yet.")
-        return
-
-    import pandas as pd  # noqa: PLC0415
-
-    recent = submissions[:10]
-    rows = []
-    for s in recent:
-        icon = SUB_STATUS_COLOUR.get(s["status"], "⚪")
-        created = s["created_at"][:10]
-        rows.append({
-            "": icon,
-            "PRO": s["pro_id"],
-            "Method": s["submission_method"],
-            "Status": s["status"],
-            "Date": created,
-        })
-
-    df = pd.DataFrame(rows)
-    st.dataframe(df, use_container_width=True, hide_index=True)
-
-    failed = [s for s in submissions if s["status"] == "failed"]
-    if failed:
-        st.error(
-            f"{len(failed)} failed submission(s). Go to **Submissions** to retry."
-        )
-
-
-def _render_compliance_checklist(obligations: list[dict]) -> None:
-    st.subheader("Compliance checklist")
-
-    has_products = api_client.list_products(limit=1)
-    steps = [
-        (
-            bool(has_products),
-            "Product data uploaded",
-            "Upload your product weight data on the **Products** page.",
-        ),
-        (
-            any(o["status"] in ("draft", "finalised", "submitted") for o in obligations),
-            "At least one calculation run",
-            "Run your first EPR calculation on the **Calculations** page.",
-        ),
-        (
-            any(o["status"] in ("finalised", "submitted") for o in obligations),
-            "At least one obligation finalised",
-            "Finalise a calculation to lock in the fee amount before submitting.",
-        ),
-        (
-            any(o["status"] == "submitted" for o in obligations),
-            "At least one obligation submitted",
-            "Submit a finalised obligation to the PRO via the **Submissions** page.",
-        ),
-    ]
-
-    all_done = all(done for done, _, _ in steps)
-    if all_done:
-        st.success("✅ All compliance steps completed for the current period!")
+    if not calendar:
+        st.info("Ei tulevia raportointipäiväyksiä. Lisää PRO-rekisteröinnit Admin-osiosta ja varmista että ReportingDeadlines on täytetty.")
     else:
-        st.caption("Complete these steps to stay compliant:")
+        for item in calendar:
+            urgency = item.get("urgency", "ok")
+            icon, alert_type = URGENCY_CONFIG.get(urgency, ("\U0001f7e2", "success"))
+            country = item["country_code"]
+            flag = FLAGS.get(country, "\U0001f310")
+            days = item["days_until_deadline"]
+            obl_status = item.get("obligation_status")
+            obl_icon = OBL_STATUS_ICON.get(obl_status, OBL_STATUS_ICON[None])
 
-    for done, label, hint in steps:
-        icon = "✅" if done else "⬜"
-        col_icon, col_text = st.columns([1, 12])
-        with col_icon:
-            st.markdown(icon)
-        with col_text:
-            if done:
-                st.markdown(f"**{label}**")
-            else:
-                st.markdown(f"{label}")
-                st.caption(hint)
+            days_label = f"{days} pv" if days > 0 else "TÄNÄÄN"
+            title = f"{icon} {flag} **{item['pro_name']}** — {item['product_category']} — deadline {item['submission_deadline']} ({days_label})"
+
+            with st.expander(title, expanded=(urgency == "critical")):
+                col1, col2, col3 = st.columns(3)
+                col1.markdown(f"**Raportointijakso**  \n{item['reporting_period_start']} – {item['reporting_period_end']}")
+                col2.markdown(f"**Velvoite**  \n{obl_icon} {obl_status or 'ei laskettu'}")
+                col3.markdown(f"**Deadline**  \n{item['submission_deadline']}")
+
+                if item.get("pro_portal_url"):
+                    st.markdown(f"[Avaa PRO-portaali ↗]({item['pro_portal_url']})")
+                if item.get("notes"):
+                    st.caption(item["notes"])
+
+                if obl_status is None:
+                    st.warning("⚠️ Velvoitetta ei ole vielä laskettu tälle jaksolle. Siirry Calculations-sivulle.")
+                elif obl_status == "draft":
+                    st.warning("📝 Velvoite on luonnoksena — viimeistele ennen lähettämistä.")
+                elif obl_status == "finalised":
+                    st.info("🔒 Velvoite on viimeistelty — valmis lähetettäväksi.")
+                elif obl_status == "submitted":
+                    st.success("✅ Lähetetty!")
+
+    st.divider()
+
+    # ---------- Active PRO overview ----------
+    col_left, col_right = st.columns(2)
+
+    with col_left:
+        st.subheader("\U0001f5c4️ Aktiiviset PRO-rekisteröinnit")
+        try:
+            regs = api_client.my_registrations()
+        except Exception:
+            regs = []
+
+        if not regs:
+            st.info("Ei aktiivisia rekisteröintejä.")
+        else:
+            active = [r for r in regs if r["status"] == "active"]
+            for r in active:
+                pro = r.get("pro") or {}
+                country = pro.get("country_code", "")
+                flag = FLAGS.get(country, "\U0001f310")
+                reg_num = f" `{r['registration_number']}`" if r.get("registration_number") else ""
+                st.markdown(f"{flag} **{pro.get('name', '?')}** — {pro.get('category', '')}{reg_num}")
+
+    with col_right:
+        st.subheader("\U0001f4c4 Viimeisimmät lähetykset")
+        try:
+            reports = api_client.my_reports()[:5]
+        except Exception:
+            reports = []
+
+        if not reports:
+            st.info("Ei lähetyksiä vielä.")
+        else:
+            for r in reports:
+                obl = r.get("obligation") or {}
+                status_icon = {"success": "\U0001f7e2", "failed": "\U0001f534", "pending": "\U0001f7e1"}.get(r["status"], "⚪")
+                country = obl.get("country_code", "")
+                flag = FLAGS.get(country, "")
+                st.markdown(f"{status_icon} {flag} {r['pro_id']} — {r['submitted_at'][:10]}")

@@ -45,34 +45,25 @@ app.add_middleware(
 )
 
 from uusio.api.routers import (  # noqa: E402
-    admin,
-    auth,
-    billing,
-    calculations,
-    customers,
-    data_sources,
-    packaging,
-    portal,
-    pro_registry,
-    products,
-    regulations,
-    submissions,
-    audit,
+    admin, auth, billing, calculations, customers,
+    data_sources, packaging, portal, pro_registry,
+    products, regulations, submissions, audit, volumes,
 )
 
-app.include_router(auth.router,         prefix="/api/v1/auth",                  tags=["auth"])
-app.include_router(customers.router,    prefix="/api/v1/customers",             tags=["customers"])
-app.include_router(data_sources.router, prefix="/api/v1/data-sources",          tags=["data-sources"])
-app.include_router(products.router,     prefix="/api/v1/products",              tags=["products"])
-app.include_router(calculations.router, prefix="/api/v1/calculations",          tags=["calculations"])
-app.include_router(submissions.router,  prefix="/api/v1/submissions",           tags=["submissions"])
-app.include_router(audit.router,        prefix="/api/v1/audit-log",             tags=["audit"])
-app.include_router(packaging.router,    prefix="/api/v1/packaging-components",  tags=["packaging"])
-app.include_router(admin.router,        prefix="/api/v1/admin",                 tags=["admin"])
-app.include_router(billing.router,      prefix="/api/v1/billing",               tags=["billing"])
-app.include_router(regulations.router,  prefix="/api/v1/regulations",           tags=["regulations"])
-app.include_router(pro_registry.router, prefix="/api/v1/pro-registry",          tags=["pro-registry"])
-app.include_router(portal.router,       prefix="/api/v1/portal",                tags=["portal"])
+app.include_router(auth.router,         prefix="/api/v1/auth",                 tags=["auth"])
+app.include_router(customers.router,    prefix="/api/v1/customers",            tags=["customers"])
+app.include_router(data_sources.router, prefix="/api/v1/data-sources",         tags=["data-sources"])
+app.include_router(products.router,     prefix="/api/v1/products",             tags=["products"])
+app.include_router(calculations.router, prefix="/api/v1/calculations",         tags=["calculations"])
+app.include_router(submissions.router,  prefix="/api/v1/submissions",          tags=["submissions"])
+app.include_router(audit.router,        prefix="/api/v1/audit-log",            tags=["audit"])
+app.include_router(packaging.router,    prefix="/api/v1/packaging-components", tags=["packaging"])
+app.include_router(admin.router,        prefix="/api/v1/admin",                tags=["admin"])
+app.include_router(billing.router,      prefix="/api/v1/billing",              tags=["billing"])
+app.include_router(regulations.router,  prefix="/api/v1/regulations",          tags=["regulations"])
+app.include_router(pro_registry.router, prefix="/api/v1/pro-registry",         tags=["pro-registry"])
+app.include_router(portal.router,       prefix="/api/v1/portal",               tags=["portal"])
+app.include_router(volumes.router,      prefix="/api/v1",                      tags=["volumes"])
 
 
 @app.get("/health", tags=["health"])
