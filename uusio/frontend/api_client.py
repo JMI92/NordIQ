@@ -1,7 +1,4 @@
-"""Thin HTTP client for the Uusio API.
-
-All Streamlit pages import from here — never call requests directly in page code.
-"""
+"""Thin HTTP client for the Uusio API."""
 from __future__ import annotations
 
 import os
@@ -67,6 +64,31 @@ def list_product_weights(product_id: str) -> list[dict]:
 
 def upload_products_csv(file_bytes: bytes, filename: str) -> dict:
     return _handle(requests.post(f"{_base_url()}/api/v1/products/upload-csv", headers=_headers(), files={"file": (filename, file_bytes, "text/csv")}, timeout=60))
+
+
+# Material composition
+def get_composition(product_id: str) -> list[dict]:
+    return _handle(requests.get(f"{_base_url()}/api/v1/products/{product_id}/composition", headers=_headers(), timeout=10))
+
+def save_composition(product_id: str, payload: list[dict]) -> list[dict]:
+    return _handle(requests.put(f"{_base_url()}/api/v1/products/{product_id}/composition", json=payload, headers=_headers(), timeout=10))
+
+
+# Monthly volumes
+def list_volumes(year: int | None = None, month: int | None = None) -> list[dict]:
+    params = {}
+    if year: params["year"] = year
+    if month: params["month"] = month
+    return _handle(requests.get(f"{_base_url()}/api/v1/volumes", headers=_headers(), params=params, timeout=10))
+
+def upsert_volume(product_id: str, year: int, month: int, units_sold: float) -> dict:
+    return _handle(requests.post(f"{_base_url()}/api/v1/volumes", json={"product_id": product_id, "year": year, "month": month, "units_sold": units_sold}, headers=_headers(), timeout=10))
+
+def upload_volumes_csv(file_bytes: bytes, filename: str) -> dict:
+    return _handle(requests.post(f"{_base_url()}/api/v1/volumes/upload-csv", headers=_headers(), files={"file": (filename, file_bytes)}, timeout=60))
+
+def calculate_from_volumes(year: int, month: int) -> dict:
+    return _handle(requests.post(f"{_base_url()}/api/v1/volumes/calculate", headers=_headers(), params={"year": year, "month": month}, timeout=30))
 
 
 # Calculations
@@ -184,12 +206,15 @@ def delete_registration(reg_id: str) -> None:
     _handle(requests.delete(f"{_base_url()}/api/v1/pro-registry/registrations/{reg_id}", headers=_headers(), timeout=10))
 
 
-# Portal (customer self-service)
+# Portal
 def portal_summary() -> dict:
     return _handle(requests.get(f"{_base_url()}/api/v1/portal/summary", headers=_headers(), timeout=10))
 
 def my_registrations() -> list[dict]:
     return _handle(requests.get(f"{_base_url()}/api/v1/portal/registrations", headers=_headers(), timeout=10))
+
+def reporting_calendar() -> list[dict]:
+    return _handle(requests.get(f"{_base_url()}/api/v1/portal/reporting-calendar", headers=_headers(), timeout=10))
 
 def my_reports() -> list[dict]:
     return _handle(requests.get(f"{_base_url()}/api/v1/portal/reports", headers=_headers(), timeout=10))
