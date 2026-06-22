@@ -1,7 +1,7 @@
 """add invoices and regulation_entries tables
 
 Revision ID: 0003
-Revises: 20260614120000_add_epr_structural_extensions
+Revises: 20260614120000
 Create Date: 2026-06-21
 """
 from alembic import op
@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "0003"
-down_revision = "20260614120000_add_epr_structural_extensions"
+down_revision = "20260614120000"
 branch_labels = None
 depends_on = None
 
