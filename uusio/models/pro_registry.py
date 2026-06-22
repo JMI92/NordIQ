@@ -4,7 +4,7 @@ import uuid
 from datetime import date
 
 from sqlalchemy import Boolean, Date, ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from uusio.core.database import Base
@@ -17,11 +17,8 @@ class PROOrganisation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "pro_organisations"
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    # Country this PRO operates in, e.g. FI, SE, NO, DK, DE
     country_code: Mapped[str] = mapped_column(String(3), nullable=False, index=True)
-    # EPR category this PRO handles
     category: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
-    # Internal short ID used in submissions (e.g. "rinki-fi", "el-kretsen-se")
     pro_key: Mapped[str] = mapped_column(String(50), nullable=False, unique=True, index=True)
     website: Mapped[str | None] = mapped_column(String(500), nullable=True)
     portal_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
@@ -58,9 +55,8 @@ class CustomerPRORegistration(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         nullable=False,
         index=True,
     )
-    # Customer's own registration/member number at this PRO
     registration_number: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    # active / pending / expired / suspended
+    material_categories: Mapped[list | None] = mapped_column(JSONB, nullable=True, default=list)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="active", index=True)
     contract_start: Mapped[date | None] = mapped_column(Date, nullable=True)
     contract_end: Mapped[date | None] = mapped_column(Date, nullable=True)

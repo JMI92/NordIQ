@@ -3,7 +3,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError
 from sqlalchemy import select
@@ -48,3 +48,26 @@ def require_customer_scope(customer_id: uuid.UUID):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
         return current_user
     return _check
+
+
+async def get_org_scope(
+    request: Request,
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> uuid.UUID:
+    """Return the effective org UUID for the current request.
+
+    Members: always their own customer_id.
+    Admins: must supply X-Impersonate-Org header to act on a tenant.
+    """
+    if current_user.is_admin:
+        impersonate = request.headers.get("X-Impersonate-Org")
+        if impersonate:
+            try:
+                return uuid.UUID(impersonate)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid X-Impersonate-Org header")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin must supply X-Impersonate-Org header to access tenant data",
+        )
+    return current_user.customer_id

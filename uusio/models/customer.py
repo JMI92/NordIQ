@@ -18,6 +18,7 @@ class Customer(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     vat_number: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     country_of_incorporation: Mapped[str] = mapped_column(String(2), nullable=False)
+    contact_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     users: Mapped[list["User"]] = relationship("User", back_populates="customer", cascade="all, delete-orphan")  # type: ignore[name-defined]

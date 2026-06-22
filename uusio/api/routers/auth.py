@@ -5,13 +5,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from uusio.api.dependencies import get_current_user
 from uusio.core.database import get_db
-from uusio.core.security import create_access_token, hash_password, verify_password
-from uusio.models.customer import Customer
+from uusio.core.security import create_access_token, verify_password
 from uusio.models.user import User
 
 router = APIRouter()
@@ -20,23 +19,7 @@ router = APIRouter()
 class Token(BaseModel):
     access_token: str
     token_type: str
-
-
-class RegisterRequest(BaseModel):
-    email: str
-    password: str
-    full_name: str
-    company_name: str
-    country_code: str = "FI"
-
-
-class RegisterResponse(BaseModel):
-    id: str
-    email: str
-    full_name: str
-    is_admin: bool
-    active: bool
-    message: str
+    role: str
 
 
 @router.post("/login", response_model=Token)
@@ -54,51 +37,14 @@ async def login(
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    token = create_access_token(subject=str(user.id), customer_id=str(user.customer_id))
-    return Token(access_token=token, token_type="bearer")
-
-
-@router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
-async def register(
-    body: RegisterRequest,
-    db: Annotated[AsyncSession, Depends(get_db)],
-):
-    """Self-registration. First user becomes admin and is activated immediately."""
-    existing = await db.execute(select(User).where(User.email == body.email))
-    if existing.scalar_one_or_none() is not None:
-        raise HTTPException(status_code=409, detail="Email already registered.")
-
-    user_count = (await db.execute(select(func.count()).select_from(User))).scalar_one()
-    is_first = user_count == 0
-
-    customer = Customer(
-        name=body.company_name,
-        country_of_incorporation=body.country_code.upper()[:2],
-        is_active=True,
-    )
-    db.add(customer)
-    await db.flush()
-
-    user = User(
-        customer_id=customer.id,
-        email=body.email,
-        hashed_password=hash_password(body.password),
-        full_name=body.full_name,
-        is_active=is_first,
-        is_admin=is_first,
-    )
-    db.add(user)
-    await db.flush()
-
-    msg = "Account created. You can log in now." if is_first else "Account created. An admin must activate it before you can log in."
-    return RegisterResponse(
-        id=str(user.id),
+    role = "admin" if user.is_admin else "member"
+    token = create_access_token(
+        subject=str(user.id),
+        customer_id=str(user.customer_id),
         email=user.email,
-        full_name=user.full_name,
         is_admin=user.is_admin,
-        active=user.is_active,
-        message=msg,
     )
+    return Token(access_token=token, token_type="bearer", role=role)
 
 
 @router.get("/me")
@@ -110,4 +56,5 @@ async def get_me(current_user: Annotated[User, Depends(get_current_user)]):
         "is_admin": current_user.is_admin,
         "is_active": current_user.is_active,
         "customer_id": str(current_user.customer_id),
+        "role": "admin" if current_user.is_admin else "member",
     }
