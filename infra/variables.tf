@@ -45,11 +45,6 @@ variable "api_image" {
   type        = string
 }
 
-variable "frontend_image" {
-  description = "Docker image URI for the frontend container"
-  type        = string
-}
-
 variable "api_cpu" {
   description = "CPU units for the API task (1 vCPU = 1024)"
   type        = number
@@ -62,26 +57,8 @@ variable "api_memory" {
   default     = 512
 }
 
-variable "frontend_cpu" {
-  description = "CPU units for the frontend task"
-  type        = number
-  default     = 256
-}
-
-variable "frontend_memory" {
-  description = "Memory (MiB) for the frontend task"
-  type        = number
-  default     = 512
-}
-
 variable "api_desired_count" {
   description = "Number of API task replicas"
-  type        = number
-  default     = 1
-}
-
-variable "frontend_desired_count" {
-  description = "Number of frontend task replicas"
   type        = number
   default     = 1
 }
