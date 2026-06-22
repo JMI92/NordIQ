@@ -45,10 +45,26 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:8501"
     api_url: str = "http://localhost:8000"
 
+    # CORS — comma-separated list of allowed origins (in addition to frontend_url)
+    # Example: "https://app.uusio.io,https://myapp.lovable.app"
+    extra_cors_origins: str = ""
+
     @field_validator("encryption_key")
     @classmethod
     def encryption_key_must_be_set_in_production(cls, v: str, info) -> str:
         return v
+
+    @property
+    def cors_origins(self) -> list[str]:
+        origins = [
+            self.frontend_url,
+            "http://localhost:3000",   # React dev server
+            "http://localhost:5173",   # Vite dev server
+            "http://localhost:8501",   # Streamlit
+        ]
+        if self.extra_cors_origins:
+            origins += [o.strip() for o in self.extra_cors_origins.split(",") if o.strip()]
+        return list(dict.fromkeys(origins))  # deduplicate, preserve order
 
     @property
     def is_production(self) -> bool:
