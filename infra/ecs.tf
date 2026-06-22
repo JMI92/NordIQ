@@ -43,6 +43,7 @@ resource "aws_ecs_task_definition" "api" {
       { name = "SYNC_DATABASE_URL", valueFrom = "${aws_secretsmanager_secret.app.arn}:sync_database_url::" },
       { name = "SECRET_KEY",        valueFrom = "${aws_secretsmanager_secret.app.arn}:secret_key::" },
       { name = "ENCRYPTION_KEY",    valueFrom = "${aws_secretsmanager_secret.app.arn}:encryption_key::" },
+      { name = "ANTHROPIC_API_KEY", valueFrom = "${aws_secretsmanager_secret.app.arn}:anthropic_api_key::" },
     ]
 
     logConfiguration = {

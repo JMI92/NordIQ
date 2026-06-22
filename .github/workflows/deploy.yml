@@ -59,4 +59,5 @@ jobs:
             -var="frontend_image=$FRONTEND_IMAGE" \
             -var="db_password=${{ secrets.TF_VAR_DB_PASSWORD }}" \
             -var="secret_key=${{ secrets.TF_VAR_SECRET_KEY }}" \
-            -var="encryption_key=${{ secrets.TF_VAR_ENCRYPTION_KEY }}"
+            -var="encryption_key=${{ secrets.TF_VAR_ENCRYPTION_KEY }}" \
+            -var="anthropic_api_key=${{ secrets.ANTHROPIC_API_KEY }}"

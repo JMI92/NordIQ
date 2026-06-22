@@ -122,6 +122,13 @@ variable "encryption_key" {
   sensitive   = true
 }
 
+variable "anthropic_api_key" {
+  description = "Anthropic API key for AI material classification"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "smtp_from" {
   description = "From address for SES emails"
   type        = string
