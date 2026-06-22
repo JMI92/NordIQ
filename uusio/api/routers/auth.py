@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,7 +23,7 @@ class Token(BaseModel):
 
 
 class RegisterRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str
     full_name: str
     company_name: str
@@ -63,45 +63,34 @@ async def register(
     body: RegisterRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """Self-registration endpoint.
-
-    The very first registered user becomes admin and is activated immediately.
-    Subsequent users are created inactive and must be activated by an admin.
-    """
-    # Check email not already taken
+    """Self-registration. First user becomes admin and is activated immediately."""
     existing = await db.execute(select(User).where(User.email == body.email))
     if existing.scalar_one_or_none() is not None:
         raise HTTPException(status_code=409, detail="Email already registered.")
 
-    # Is this the first user ever?
-    user_count_result = await db.execute(select(func.count()).select_from(User))
-    is_first_user = (user_count_result.scalar_one() == 0)
+    user_count = (await db.execute(select(func.count()).select_from(User))).scalar_one()
+    is_first = user_count == 0
 
-    # Create a customer (tenant) for this registration
     customer = Customer(
         name=body.company_name,
         country_of_incorporation=body.country_code.upper()[:2],
         is_active=True,
     )
     db.add(customer)
-    await db.flush()  # get customer.id
+    await db.flush()
 
     user = User(
         customer_id=customer.id,
         email=body.email,
         hashed_password=hash_password(body.password),
         full_name=body.full_name,
-        is_active=is_first_user,   # first user active immediately
-        is_admin=is_first_user,    # first user is admin
+        is_active=is_first,
+        is_admin=is_first,
     )
     db.add(user)
     await db.flush()
 
-    if is_first_user:
-        msg = "Account created. You can log in now."
-    else:
-        msg = "Account created. An admin must activate it before you can log in."
-
+    msg = "Account created. You can log in now." if is_first else "Account created. An admin must activate it before you can log in."
     return RegisterResponse(
         id=str(user.id),
         email=user.email,
