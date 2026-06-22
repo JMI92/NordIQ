@@ -3,11 +3,6 @@ resource "aws_cloudwatch_log_group" "api" {
   retention_in_days = 30
 }
 
-resource "aws_cloudwatch_log_group" "frontend" {
-  name              = "/ecs/${var.app_name}-frontend"
-  retention_in_days = 30
-}
-
 resource "aws_sns_topic" "alarms" {
   name = "${var.app_name}-${var.environment}-alarms"
 }

@@ -43,7 +43,6 @@ resource "aws_ecs_task_definition" "api" {
       { name = "SYNC_DATABASE_URL", valueFrom = "${aws_secretsmanager_secret.app.arn}:sync_database_url::" },
       { name = "SECRET_KEY",        valueFrom = "${aws_secretsmanager_secret.app.arn}:secret_key::" },
       { name = "ENCRYPTION_KEY",    valueFrom = "${aws_secretsmanager_secret.app.arn}:encryption_key::" },
-      { name = "ANTHROPIC_API_KEY", valueFrom = "${aws_secretsmanager_secret.app.arn}:anthropic_api_key::" },
     ]
 
     logConfiguration = {
@@ -65,40 +64,6 @@ resource "aws_ecs_task_definition" "api" {
   }])
 }
 
-resource "aws_ecs_task_definition" "frontend" {
-  family                   = "${var.app_name}-frontend"
-  requires_compatibilities = ["FARGATE"]
-  network_mode             = "awsvpc"
-  cpu                      = var.frontend_cpu
-  memory                   = var.frontend_memory
-  execution_role_arn       = aws_iam_role.ecs_execution.arn
-  task_role_arn            = aws_iam_role.ecs_task.arn
-
-  container_definitions = jsonencode([{
-    name       = "frontend"
-    image      = var.frontend_image
-    essential  = true
-
-    portMappings = [{
-      containerPort = 8501
-      protocol      = "tcp"
-    }]
-
-    environment = [
-      { name = "API_URL", value = "https://app.${var.domain_name}" },
-    ]
-
-    logConfiguration = {
-      logDriver = "awslogs"
-      options = {
-        "awslogs-group"         = aws_cloudwatch_log_group.frontend.name
-        "awslogs-region"        = var.aws_region
-        "awslogs-stream-prefix" = "frontend"
-      }
-    }
-  }])
-}
-
 resource "aws_ecs_service" "api" {
   name            = "${var.app_name}-api"
   cluster         = aws_ecs_cluster.main.id
@@ -116,28 +81,6 @@ resource "aws_ecs_service" "api" {
     target_group_arn = aws_lb_target_group.api.arn
     container_name   = "api"
     container_port   = 8000
-  }
-
-  depends_on = [aws_lb_listener.http]
-}
-
-resource "aws_ecs_service" "frontend" {
-  name            = "${var.app_name}-frontend"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.frontend.arn
-  desired_count   = var.frontend_desired_count
-  launch_type     = "FARGATE"
-
-  network_configuration {
-    subnets          = aws_subnet.private[*].id
-    security_groups  = [aws_security_group.frontend.id]
-    assign_public_ip = false
-  }
-
-  load_balancer {
-    target_group_arn = aws_lb_target_group.frontend.arn
-    container_name   = "frontend"
-    container_port   = 8501
   }
 
   depends_on = [aws_lb_listener.http]

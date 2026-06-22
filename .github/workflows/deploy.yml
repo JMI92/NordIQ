@@ -7,7 +7,6 @@ on:
 env:
   AWS_REGION: eu-north-1
   ECR_API_REPO: 210039345242.dkr.ecr.eu-north-1.amazonaws.com/uusio-api
-  ECR_FRONTEND_REPO: 210039345242.dkr.ecr.eu-north-1.amazonaws.com/uusio-frontend
 
 jobs:
   deploy:
@@ -35,13 +34,6 @@ jobs:
           docker push $IMAGE
           echo "API_IMAGE=$IMAGE" >> $GITHUB_ENV
 
-      - name: Build & push frontend image
-        run: |
-          IMAGE=$ECR_FRONTEND_REPO:${{ github.sha }}
-          docker build --platform linux/amd64 -f Dockerfile.frontend -t $IMAGE .
-          docker push $IMAGE
-          echo "FRONTEND_IMAGE=$IMAGE" >> $GITHUB_ENV
-
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -56,8 +48,6 @@ jobs:
         run: |
           terraform apply -auto-approve \
             -var="api_image=$API_IMAGE" \
-            -var="frontend_image=$FRONTEND_IMAGE" \
             -var="db_password=${{ secrets.TF_VAR_DB_PASSWORD }}" \
             -var="secret_key=${{ secrets.TF_VAR_SECRET_KEY }}" \
-            -var="encryption_key=${{ secrets.TF_VAR_ENCRYPTION_KEY }}" \
-            -var="anthropic_api_key=${{ secrets.ANTHROPIC_API_KEY }}"
+            -var="encryption_key=${{ secrets.TF_VAR_ENCRYPTION_KEY }}"

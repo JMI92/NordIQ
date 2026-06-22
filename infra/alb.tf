@@ -24,22 +24,6 @@ resource "aws_lb_target_group" "api" {
   }
 }
 
-resource "aws_lb_target_group" "frontend" {
-  name        = "${var.app_name}-frontend-tg"
-  port        = 8501
-  protocol    = "HTTP"
-  vpc_id      = aws_vpc.main.id
-  target_type = "ip"
-
-  health_check {
-    path                = "/_stcore/health"
-    healthy_threshold   = 2
-    unhealthy_threshold = 3
-    interval            = 30
-    timeout             = 5
-  }
-}
-
 # HTTP → HTTPS redirect
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.main.arn
@@ -66,7 +50,7 @@ resource "aws_lb_listener" "https" {
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.frontend.arn
+    target_group_arn = aws_lb_target_group.api.arn
   }
 }
 
@@ -83,23 +67,6 @@ resource "aws_lb_listener_rule" "api" {
   condition {
     path_pattern {
       values = ["/api/*", "/health"]
-    }
-  }
-}
-
-# app.uusio.io → Streamlit frontend
-resource "aws_lb_listener_rule" "frontend_host" {
-  listener_arn = aws_lb_listener.https.arn
-  priority     = 20
-
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.frontend.arn
-  }
-
-  condition {
-    host_header {
-      values = ["app.${var.domain_name}"]
     }
   }
 }
