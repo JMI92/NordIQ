@@ -4,7 +4,7 @@ import uuid
 from datetime import date
 
 from sqlalchemy import Boolean, Date, ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from uusio.core.database import Base
@@ -60,6 +60,8 @@ class CustomerPRORegistration(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     # Customer's own registration/member number at this PRO
     registration_number: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # Material categories covered by this registration e.g. ["packaging", "electronics"]
+    material_categories: Mapped[list | None] = mapped_column(JSONB, nullable=True, default=list)
     # active / pending / expired / suspended
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="active", index=True)
     contract_start: Mapped[date | None] = mapped_column(Date, nullable=True)

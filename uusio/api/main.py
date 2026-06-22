@@ -46,7 +46,7 @@ app.add_middleware(
     allow_origin_regex=r"https://.*\.(lovable\.app|lovableproject\.com)$",
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*", "X-Impersonate-Org"],
 )
 
 from uusio.api.routers import (  # noqa: E402

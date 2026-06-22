@@ -25,9 +25,17 @@ def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
 
 
-def create_access_token(subject: str, customer_id: str) -> str:
+def create_access_token(subject: str, customer_id: str, email: str = "", is_admin: bool = False) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
-    payload = {"sub": subject, "customer_id": customer_id, "exp": expire}
+    role = "admin" if is_admin else "member"
+    payload = {
+        "sub": subject,
+        "customer_id": customer_id,
+        "org_id": customer_id,
+        "email": email,
+        "role": role,
+        "exp": expire,
+    }
     return jwt.encode(payload, settings.secret_key, algorithm=ALGORITHM)
 
 

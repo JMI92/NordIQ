@@ -19,6 +19,7 @@ router = APIRouter()
 class Token(BaseModel):
     access_token: str
     token_type: str
+    role: str
 
 
 @router.post("/login", response_model=Token)
@@ -36,8 +37,14 @@ async def login(
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    token = create_access_token(subject=str(user.id), customer_id=str(user.customer_id))
-    return Token(access_token=token, token_type="bearer")
+    role = "admin" if user.is_admin else "member"
+    token = create_access_token(
+        subject=str(user.id),
+        customer_id=str(user.customer_id),
+        email=user.email,
+        is_admin=user.is_admin,
+    )
+    return Token(access_token=token, token_type="bearer", role=role)
 
 
 @router.get("/me")
