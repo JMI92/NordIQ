@@ -1,8 +1,7 @@
-"""Product and product weight endpoints — list, upload CSV, bulk upsert."""
+"""Product endpoints — list, bulk upsert with AI classification, CSV upload."""
 
 from __future__ import annotations
 
-import io
 import uuid
 from typing import Annotated
 
@@ -16,7 +15,7 @@ from uusio.api.dependencies import get_current_user
 from uusio.core.database import get_db
 from uusio.ingestion.base import DataSourceConfig
 from uusio.ingestion.csv_ingestor import CSVIngestor
-from uusio.models.enums import DataRecordSource, MaterialType, ProductCategory
+from uusio.models.enums import DataRecordSource
 from uusio.models.product import Product, ProductWeight
 from uusio.models.user import User
 from uusio.models.volumes import ProductMaterialComposition
@@ -44,18 +43,21 @@ class ProductIn(BaseModel):
     id: str | None = None
     sku: str
     name: str
-    category: str
+    category: str = ""
+    description: str = ""
     materials: list[MaterialIn] = []
 
 
 class BulkUpsertRequest(BaseModel):
     products: list[ProductIn]
+    classify: bool = True  # set False to skip AI classification
 
 
 class MaterialOut(BaseModel):
     type: str
     weightKg: float
     isPackaging: bool
+    aiClassified: bool = False
 
 
 class ProductOut(BaseModel):
@@ -64,6 +66,8 @@ class ProductOut(BaseModel):
     name: str
     category: str
     materials: list[MaterialOut]
+    aiConfidence: float | None = None
+    aiReasoning: str | None = None
 
 
 class ProductResponse(BaseModel):
@@ -96,7 +100,11 @@ class CSVUploadResponse(BaseModel):
     error_details: list[dict]
 
 
-def _product_to_out(p: Product) -> ProductOut:
+def _product_to_out(
+    p: Product,
+    ai_confidence: float | None = None,
+    ai_reasoning: str | None = None,
+) -> ProductOut:
     return ProductOut(
         id=str(p.id),
         sku=p.external_product_id,
@@ -107,9 +115,12 @@ def _product_to_out(p: Product) -> ProductOut:
                 type=c.material_type,
                 weightKg=float(c.weight_per_unit_kg),
                 isPackaging=c.is_packaging,
+                aiClassified=bool(getattr(c, "ai_classified", False)),
             )
             for c in (p.compositions or [])
         ],
+        aiConfidence=ai_confidence,
+        aiReasoning=ai_reasoning,
     )
 
 
@@ -156,13 +167,49 @@ async def bulk_upsert_products(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> list[ProductOut]:
-    """Create or update products with their material compositions.
+    """Create or update products with optional AI material classification.
 
-    Matches on SKU (external_product_id). Replaces compositions on each upsert.
+    If a product has no materials and classify=True, Claude classifies it automatically.
+    Matches on SKU. Replaces compositions on each upsert.
     """
+    # Determine which products need AI classification
+    needs_ai = [
+        {"sku": p.sku, "name": p.name, "description": p.description or p.name, "category": p.category}
+        for p in body.products
+        if not p.materials and body.classify
+    ]
+
+    ai_results: dict[str, dict] = {}
+    if needs_ai:
+        from uusio.services.material_classifier import classify_products_batch
+        classifications = await classify_products_batch(needs_ai)
+        for c in classifications:
+            if c["result"]:
+                ai_results[c["sku"]] = c["result"]
+
     results: list[ProductOut] = []
 
     for item in body.products:
+        # Resolve materials: provided by caller OR AI-classified
+        ai_data = ai_results.get(item.sku)
+        if not item.materials and ai_data:
+            resolved_materials = [
+                MaterialIn(
+                    type=m["material_type"],
+                    weightKg=m["weight_per_unit_kg"],
+                    isPackaging=m["is_packaging"],
+                )
+                for m in ai_data.get("materials", [])
+            ]
+            resolved_category = ai_data.get("category") or item.category
+            ai_confidence = ai_data.get("confidence")
+            ai_reasoning = ai_data.get("reasoning")
+        else:
+            resolved_materials = item.materials
+            resolved_category = item.category
+            ai_confidence = None
+            ai_reasoning = None
+
         # Upsert product
         res = await db.execute(
             select(Product)
@@ -179,20 +226,20 @@ async def bulk_upsert_products(
                 customer_id=current_user.customer_id,
                 external_product_id=item.sku,
                 description=item.name,
-                product_category=item.category,
+                product_category=resolved_category or "other",
             )
             db.add(product)
-            await db.flush()  # get product.id
+            await db.flush()
         else:
             product.description = item.name
-            product.product_category = item.category
-            # Delete existing compositions
+            if resolved_category:
+                product.product_category = resolved_category
             for c in list(product.compositions):
                 await db.delete(c)
             await db.flush()
 
-        # Insert new compositions
-        for mat in item.materials:
+        # Insert compositions
+        for mat in resolved_materials:
             db.add(ProductMaterialComposition(
                 product_id=product.id,
                 material_type=mat.type,
@@ -202,14 +249,14 @@ async def bulk_upsert_products(
 
         await db.flush()
 
-        # Reload with compositions for response
+        # Reload with compositions
         res2 = await db.execute(
             select(Product)
             .options(selectinload(Product.compositions))
             .where(Product.id == product.id)
         )
         product = res2.scalar_one()
-        results.append(_product_to_out(product))
+        results.append(_product_to_out(product, ai_confidence, ai_reasoning))
 
     return results
 
