@@ -40,6 +40,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         settings.frontend_url,
+        "https://app.uusio.io",
+        "https://www.uusio.io",
+        "https://uusio.io",
         "http://localhost:3000",
         "http://localhost:5173",
     ],
