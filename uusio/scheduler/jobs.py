@@ -19,6 +19,7 @@ from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from uusio.scheduler.deadline_checker import check_upcoming_deadlines
+from uusio.scheduler.regulation_monitor import fetch_regulation_updates
 
 logger = logging.getLogger(__name__)
 
@@ -44,9 +45,22 @@ def setup_scheduler(session_factory: async_sessionmaker[AsyncSession]) -> AsyncI
         misfire_grace_time=3600,
     )
 
+    scheduler.add_job(
+        fetch_regulation_updates,
+        trigger=CronTrigger(day_of_week="sun", hour=6, minute=0, timezone="UTC"),
+        id="regulation_monitor",
+        name="Weekly EPR regulation update fetch",
+        args=[session_factory],
+        replace_existing=True,
+        misfire_grace_time=3600,
+    )
+
     scheduler.start()
     _scheduler = scheduler
-    logger.info("APScheduler started — deadline_check job scheduled at 08:00 UTC daily")
+    logger.info(
+        "APScheduler started — deadline_check at 08:00 UTC daily, "
+        "regulation_monitor at 06:00 UTC Sundays"
+    )
     return scheduler
 
 
