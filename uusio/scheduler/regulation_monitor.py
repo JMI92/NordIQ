@@ -10,6 +10,8 @@ Sources checked:
 
 Run weekly (Sundays 06:00 UTC) via APScheduler.
 New or changed regulations are upserted into regulation_entries.
+Urgent items (effective within 90 days) are tagged "urgent".
+Gap analysis flags country+category combos with active PRO contracts but no regulation.
 """
 
 from __future__ import annotations
@@ -17,7 +19,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import TypedDict
 from xml.etree import ElementTree
 
@@ -25,9 +27,12 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from uusio.models.pro_registry import CustomerPRORegistration, PROOrganisation
 from uusio.models.regulation import RegulationEntry
 
 logger = logging.getLogger(__name__)
+
+URGENCY_DAYS = 90  # effective_date within this many days → "urgent"
 
 
 class RegulationItem(TypedDict):
@@ -69,7 +74,7 @@ def _parse_rss(xml_text: str, country_code: str, category: str, tags: list[str])
             title=title[:500],
             summary=_clean_html(desc)[:2000] or title,
             source_url=link,
-            tags=tags,
+            tags=list(tags),
             effective_date=_parse_date_loose(pub_date_str),
         ))
 
@@ -88,7 +93,7 @@ def _parse_rss(xml_text: str, country_code: str, category: str, tags: list[str])
             title=title[:500],
             summary=_clean_html(summary)[:2000] or title,
             source_url=link,
-            tags=tags,
+            tags=list(tags),
             effective_date=_parse_date_loose(updated),
         ))
 
@@ -108,54 +113,58 @@ def _parse_date_loose(s: str) -> date | None:
     return None
 
 
+def _tag_urgency(item: RegulationItem) -> RegulationItem:
+    """Add 'urgent' tag if effective_date is within URGENCY_DAYS from today."""
+    if item["effective_date"] is None:
+        return item
+    today = date.today()
+    if today <= item["effective_date"] <= today + timedelta(days=URGENCY_DAYS):
+        if "urgent" not in item["tags"]:
+            item["tags"] = item["tags"] + ["urgent"]
+    return item
+
+
 # ---------------------------------------------------------------------------
 # Feed sources
 # ---------------------------------------------------------------------------
 
 SOURCES = [
-    # EUR-Lex: environment/waste legislation feed
     {
         "url": "https://eur-lex.europa.eu/rss/rss-notifications.xml?language=EN&subject=environmental_legislation",
         "country_code": "EU",
         "category": "Packaging",
         "tags": ["EUR-Lex", "EU", "EPR"],
     },
-    # EUR-Lex: packaging and packaging waste
     {
         "url": "https://eur-lex.europa.eu/search.html?type=quick&lang=en&term=packaging+producer+responsibility&format=rss",
         "country_code": "EU",
         "category": "Packaging",
         "tags": ["EUR-Lex", "PPWR", "packaging"],
     },
-    # Swedish EPA news
     {
         "url": "https://www.naturvardsverket.se/rss/nyheter.xml",
         "country_code": "SE",
         "category": "Packaging",
         "tags": ["Sweden", "Naturvårdsverket", "EPR"],
     },
-    # Finnish SYKE news
     {
         "url": "https://www.syke.fi/fi-FI/Rss/Uutiset",
         "country_code": "FI",
         "category": "Packaging",
         "tags": ["Finland", "SYKE", "EPR"],
     },
-    # Norwegian Environment Agency
     {
         "url": "https://www.miljodirektoratet.no/rss/nyheter/",
         "country_code": "NO",
         "category": "Packaging",
         "tags": ["Norway", "Miljødirektoratet", "EPR"],
     },
-    # Danish EPA
     {
         "url": "https://mst.dk/service/nyheder/nyhedsarkiv/rss/",
         "country_code": "DK",
         "category": "Packaging",
         "tags": ["Denmark", "Miljøstyrelsen", "EPR"],
     },
-    # German UBA news
     {
         "url": "https://www.umweltbundesamt.de/rss/presse.xml",
         "country_code": "DE",
@@ -164,7 +173,6 @@ SOURCES = [
     },
 ]
 
-# Keywords that indicate EPR relevance — items without any of these are skipped
 EPR_KEYWORDS = {
     "packaging", "verpackung", "förpackning", "emballage", "pakkaus",
     "producer responsibility", "erweiterte herstellerverantwortung",
@@ -180,10 +188,74 @@ def _is_epr_relevant(item: RegulationItem) -> bool:
     return any(kw in text for kw in EPR_KEYWORDS)
 
 
-def _stable_key(item: RegulationItem) -> str:
-    """Deterministic dedup key based on URL or title+country."""
-    raw = item.get("source_url") or f"{item['country_code']}:{item['title']}"
-    return hashlib.sha256(raw.encode()).hexdigest()[:16]
+# ---------------------------------------------------------------------------
+# Gap analysis
+# ---------------------------------------------------------------------------
+
+async def _run_gap_analysis(session: AsyncSession) -> None:
+    """Find country+category combos with active PRO contracts but no regulation entry.
+
+    For each gap found, inserts a placeholder RegulationEntry tagged 'gap' and 'urgent'
+    so it surfaces immediately in the UI as something needing attention.
+    """
+    # All active PRO registrations with their PRO org info
+    rows = (await session.execute(
+        select(CustomerPRORegistration, PROOrganisation)
+        .join(PROOrganisation, CustomerPRORegistration.pro_id == PROOrganisation.id)
+        .where(CustomerPRORegistration.status == "active")
+    )).all()
+
+    # Collect unique (country_code, category) pairs from active contracts
+    covered_combos: set[tuple[str, str]] = set()
+    for reg, pro in rows:
+        categories = reg.material_categories or [pro.category]
+        for cat in categories:
+            covered_combos.add((pro.country_code.upper(), cat))
+
+    if not covered_combos:
+        return
+
+    # Find which combos already have at least one active regulation entry
+    existing = (await session.execute(
+        select(RegulationEntry.country_code, RegulationEntry.category)
+        .where(RegulationEntry.is_active == True)  # noqa: E712
+    )).all()
+    existing_combos = {(r.country_code.upper(), r.category) for r in existing}
+
+    gaps = covered_combos - existing_combos
+    if not gaps:
+        logger.info("regulation_monitor: gap analysis — no gaps found")
+        return
+
+    logger.warning("regulation_monitor: gap analysis — %d uncovered combo(s): %s", len(gaps), gaps)
+
+    for country_code, category in gaps:
+        # Check if we already have a gap placeholder for this combo
+        existing_gap = (await session.execute(
+            select(RegulationEntry).where(
+                RegulationEntry.country_code == country_code,
+                RegulationEntry.category == category,
+                RegulationEntry.tags.contains(["gap"]),
+            )
+        )).scalar_one_or_none()
+
+        if existing_gap is None:
+            entry = RegulationEntry(
+                country_code=country_code,
+                category=category,
+                title=f"⚠️ Missing regulation coverage: {country_code} / {category}",
+                summary=(
+                    f"Your organisation has an active PRO contract in {country_code} for {category}, "
+                    f"but no regulation entry exists in the library for this combination. "
+                    f"Please review and add the applicable EPR regulation manually."
+                ),
+                source_url=None,
+                tags=["gap", "urgent", "action-required"],
+                effective_date=None,
+                is_active=True,
+            )
+            session.add(entry)
+            logger.info("regulation_monitor: created gap placeholder for %s/%s", country_code, category)
 
 
 # ---------------------------------------------------------------------------
@@ -206,24 +278,23 @@ async def fetch_regulation_updates(session_factory: async_sessionmaker[AsyncSess
                     source["category"],
                     source["tags"],
                 )
-                relevant = [i for i in items if _is_epr_relevant(i)]
+                relevant = [_tag_urgency(i) for i in items if _is_epr_relevant(i)]
                 logger.info(
-                    "regulation_monitor: %s → %d items, %d EPR-relevant",
-                    source["url"], len(items), len(relevant),
+                    "regulation_monitor: %s → %d items, %d EPR-relevant (%d urgent)",
+                    source["url"],
+                    len(items),
+                    len(relevant),
+                    sum(1 for i in relevant if "urgent" in i["tags"]),
                 )
                 fetched.extend(relevant)
             except Exception as exc:
                 logger.warning("regulation_monitor: failed to fetch %s: %s", source["url"], exc)
 
-    if not fetched:
-        logger.info("regulation_monitor: no new items found")
-        return
-
     async with session_factory() as session:
         new_count = 0
+        urgent_count = 0
+
         for item in fetched:
-            key = _stable_key(item)
-            # Check by source_url to avoid duplicates
             existing = None
             if item.get("source_url"):
                 existing = (await session.execute(
@@ -243,6 +314,17 @@ async def fetch_regulation_updates(session_factory: async_sessionmaker[AsyncSess
                 )
                 session.add(entry)
                 new_count += 1
+                if "urgent" in item["tags"]:
+                    urgent_count += 1
+            else:
+                # Update urgency tag on existing entry if it has become urgent
+                if "urgent" in item["tags"] and "urgent" not in (existing.tags or []):
+                    existing.tags = list(existing.tags or []) + ["urgent"]
 
+        await _run_gap_analysis(session)
         await session.commit()
-        logger.info("regulation_monitor: inserted %d new regulation entries", new_count)
+
+        logger.info(
+            "regulation_monitor: inserted %d new entries (%d urgent), gap analysis complete",
+            new_count, urgent_count,
+        )
