@@ -8,8 +8,8 @@ from sqlalchemy import engine_from_config, pool
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 # Import the base and all models so Alembic can detect them
-from nordiq.core.database import Base
-import nordiq.models  # noqa: F401 — registers all models with Base.metadata
+from uusio.core.database import Base
+import uusio.models  # noqa: F401 — registers all models with Base.metadata
 
 config = context.config
 
