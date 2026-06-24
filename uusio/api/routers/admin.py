@@ -57,6 +57,10 @@ def _contract_out(reg: CustomerPRORegistration, pro: PROOrganisation) -> dict:
         "status": reg.status,
         "validFrom": reg.contract_start.isoformat() if reg.contract_start else None,
         "validTo": reg.contract_end.isoformat() if reg.contract_end else None,
+        "submissionMethod": pro.submission_method,
+        "submissionEmail": pro.submission_email,
+        "submissionApiUrl": pro.submission_api_url,
+        "submissionNotes": pro.submission_notes,
     }
 
 
@@ -297,6 +301,56 @@ async def delete_pro_contract(
         raise HTTPException(status_code=404, detail="Contract not found")
     await db.delete(reg)
     await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# PRO Submission configuration
+# ---------------------------------------------------------------------------
+
+class ProSubmissionConfig(BaseModel):
+    submissionMethod: str | None = None   # email | api | portal | manual
+    submissionEmail: str | None = None
+    submissionApiUrl: str | None = None
+    submissionApiKey: str | None = None   # plaintext; stored encrypted
+    submissionNotes: str | None = None
+
+
+@router.patch("/pro-contracts/{contract_id}/submission-config")
+async def update_pro_submission_config(
+    contract_id: uuid.UUID,
+    body: ProSubmissionConfig,
+    admin: AdminUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Configure how reports are submitted to a specific PRO.
+
+    Called when onboarding a new PRO to define whether submissions happen
+    via email, API, portal upload, or manual process.
+    """
+    row = (await db.execute(
+        select(CustomerPRORegistration, PROOrganisation)
+        .join(PROOrganisation, CustomerPRORegistration.pro_id == PROOrganisation.id)
+        .where(CustomerPRORegistration.id == contract_id)
+    )).one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Contract not found")
+    reg, pro = row
+
+    if body.submissionMethod is not None:
+        pro.submission_method = body.submissionMethod
+    if body.submissionEmail is not None:
+        pro.submission_email = body.submissionEmail
+    if body.submissionApiUrl is not None:
+        pro.submission_api_url = body.submissionApiUrl
+    if body.submissionApiKey is not None:
+        from uusio.core.security import encrypt_config
+        pro.submission_api_key_encrypted = encrypt_config({"key": body.submissionApiKey})
+    if body.submissionNotes is not None:
+        pro.submission_notes = body.submissionNotes
+
+    await db.commit()
+    await db.refresh(pro)
+    return _contract_out(reg, pro)
 
 
 # ---------------------------------------------------------------------------

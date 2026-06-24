@@ -45,6 +45,9 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:8501"
     api_url: str = "http://localhost:8000"
 
+    # AI
+    anthropic_api_key: str = ""
+
     @field_validator("encryption_key")
     @classmethod
     def encryption_key_must_be_set_in_production(cls, v: str, info) -> str:

@@ -33,6 +33,14 @@ class PROOrganisation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
+    # Submission configuration — set per PRO during onboarding
+    # Values: "email" | "api" | "portal" | "manual"
+    submission_method: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    submission_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    submission_api_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    submission_api_key_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    submission_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     registrations: Mapped[list["CustomerPRORegistration"]] = relationship(
         "CustomerPRORegistration", back_populates="pro", cascade="all, delete-orphan"
     )
