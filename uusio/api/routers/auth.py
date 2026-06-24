@@ -1,6 +1,5 @@
 """Authentication endpoints."""
 
-import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -34,18 +33,26 @@ async def register(
     body: RegisterRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
+    """Bootstrap endpoint — only works when no users exist yet.
+
+    After the first admin is created, all new users must be invited
+    by an admin via POST /api/v1/admin/organizations/{id}/invite.
+    """
+    first_user = (await db.execute(select(User))).scalars().first()
+    if first_user is not None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Self-registration is disabled. Contact your administrator.",
+        )
     existing = (await db.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
     if existing:
         raise HTTPException(status_code=409, detail="Email already registered")
-    # First user ever becomes admin with no customer
-    total = (await db.execute(select(User))).scalars().first()
-    is_first = total is None
     user = User(
         email=body.email,
         hashed_password=hash_password(body.password),
         full_name=body.full_name or body.email.split("@")[0],
         is_active=True,
-        is_admin=is_first,
+        is_admin=True,
         customer_id=None,
     )
     db.add(user)

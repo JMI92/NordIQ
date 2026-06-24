@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     # Security
     secret_key: str = "dev-secret-key-change-in-production"
-    encryption_key: str = ""
+    encryption_key: str = ""  # Fernet key for encrypting connector credentials
     access_token_expire_minutes: int = 60
 
     # Email
@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     s3_bucket: str = ""
     use_s3: bool = False
     use_ses: bool = False
-    ses_from: str = ""
+    ses_from: str = ""    # SES verified sender; falls back to smtp_from if empty
 
     # Storage
     report_storage_path: str = "./reports"
@@ -45,9 +45,6 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:8501"
     api_url: str = "http://localhost:8000"
 
-    # CORS
-    extra_cors_origins: str = ""
-
     # AI
     anthropic_api_key: str = ""
 
@@ -55,18 +52,6 @@ class Settings(BaseSettings):
     @classmethod
     def encryption_key_must_be_set_in_production(cls, v: str, info) -> str:
         return v
-
-    @property
-    def cors_origins(self) -> list[str]:
-        origins = [
-            self.frontend_url,
-            "http://localhost:3000",
-            "http://localhost:5173",
-            "http://localhost:8501",
-        ]
-        if self.extra_cors_origins:
-            origins += [o.strip() for o in self.extra_cors_origins.split(",") if o.strip()]
-        return list(dict.fromkeys(origins))
 
     @property
     def is_production(self) -> bool:
