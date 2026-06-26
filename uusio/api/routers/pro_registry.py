@@ -38,6 +38,11 @@ def _pro_dict(p: PROOrganisation) -> dict:
         "reporting_deadline_notes": p.reporting_deadline_notes,
         "notes": p.notes,
         "is_active": p.is_active,
+        "submission_method": p.submission_method,
+        "submission_email": p.submission_email,
+        "submission_notes": p.submission_notes,
+        "report_format": p.report_format,
+        "report_template_config": p.report_template_config,
         "created_at": p.created_at.isoformat(),
     }
 
@@ -76,6 +81,11 @@ class PROCreate(BaseModel):
     contact_phone: str | None = None
     reporting_deadline_notes: str | None = None
     notes: str | None = None
+    submission_method: str | None = None
+    submission_email: str | None = None
+    submission_notes: str | None = None
+    report_format: str = "generic_csv"
+    report_template_config: dict | None = None
 
 
 class PROUpdate(BaseModel):
@@ -89,6 +99,11 @@ class PROUpdate(BaseModel):
     reporting_deadline_notes: str | None = None
     notes: str | None = None
     is_active: bool | None = None
+    submission_method: str | None = None
+    submission_email: str | None = None
+    submission_notes: str | None = None
+    report_format: str | None = None
+    report_template_config: dict | None = None
 
 
 @router.get("/pros")

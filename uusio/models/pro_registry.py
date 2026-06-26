@@ -40,6 +40,11 @@ class PROOrganisation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     submission_api_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     submission_api_key_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
     submission_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Report format this PRO expects: "generic_csv" | "custom_csv" | "xml" | "portal_only"
+    # Set once confirmed with the PRO; drives which generator auto_submitter uses
+    report_format: Mapped[str] = mapped_column(String(20), nullable=False, default="generic_csv")
+    # PRO-specific field mapping or XML schema config stored as JSON
+    report_template_config: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     registrations: Mapped[list["CustomerPRORegistration"]] = relationship(
         "CustomerPRORegistration", back_populates="pro", cascade="all, delete-orphan"
