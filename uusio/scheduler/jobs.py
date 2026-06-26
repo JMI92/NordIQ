@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from uusio.scheduler.deadline_checker import check_upcoming_deadlines
 from uusio.scheduler.regulation_monitor import fetch_regulation_updates
 from uusio.scheduler.invoice_generator import generate_monthly_invoices, generate_annual_invoices
+from uusio.scheduler.auto_submitter import auto_submit_reports
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +74,17 @@ def setup_scheduler(session_factory: async_sessionmaker[AsyncSession]) -> AsyncI
         trigger=CronTrigger(month=1, day=1, hour=7, minute=30, timezone="UTC"),
         id="annual_invoices",
         name="Annual PRO membership fee invoice generation",
+        args=[session_factory],
+        replace_existing=True,
+        misfire_grace_time=3600,
+    )
+
+    # Auto-submit EPR reports to PROs daily at 09:00 UTC
+    scheduler.add_job(
+        auto_submit_reports,
+        trigger=CronTrigger(hour=9, minute=0, timezone="UTC"),
+        id="auto_submit_reports",
+        name="Daily automatic EPR report submission to PROs",
         args=[session_factory],
         replace_existing=True,
         misfire_grace_time=3600,

@@ -20,6 +20,88 @@ from uusio.core.config import get_settings
 logger = logging.getLogger(__name__)
 
 
+async def send_pro_report(
+    *,
+    pro_email: str,
+    pro_name: str,
+    customer_name: str,
+    country_code: str,
+    product_category: str,
+    period_start: str,
+    period_end: str,
+    csv_content: bytes,
+    csv_filename: str,
+) -> bool:
+    """Send EPR report CSV as email attachment to a PRO.
+
+    Returns True on success, False on any SMTP error.
+    """
+    settings = get_settings()
+
+    subject = (
+        f"EPR Report – {customer_name} – {country_code} {product_category} "
+        f"({period_start} to {period_end})"
+    )
+
+    body = f"""Dear {pro_name} team,
+
+Please find attached the EPR compliance report for:
+
+  Customer:         {customer_name}
+  Country:          {country_code}
+  Product category: {product_category}
+  Reporting period: {period_start} to {period_end}
+
+This report was generated and submitted automatically by Uusio EPR Compliance Platform
+on behalf of {customer_name}.
+
+If you have any questions, please contact us at juho@uusio.io.
+
+Best regards,
+Uusio EPR Compliance
+juho@uusio.io | uusio.io
+"""
+
+    if settings.use_ses:
+        from uusio.notifications.ses import send_via_ses
+        return await send_via_ses(
+            recipient_email=pro_email,
+            subject=subject,
+            body_text=body,
+            body_html=body.replace("\n", "<br>"),
+            attachment_content=csv_content,
+            attachment_filename=csv_filename,
+        )
+
+    msg = EmailMessage()
+    msg["From"] = settings.smtp_from
+    msg["To"] = pro_email
+    msg["Subject"] = subject
+    msg.set_content(body)
+    msg.add_attachment(
+        csv_content,
+        maintype="text",
+        subtype="csv",
+        filename=csv_filename,
+    )
+
+    try:
+        await aiosmtplib.send(
+            msg,
+            hostname=settings.smtp_host,
+            port=settings.smtp_port,
+            username=settings.smtp_user or None,
+            password=settings.smtp_password or None,
+            use_tls=False,
+            start_tls=settings.smtp_tls,
+        )
+        logger.info("PRO report sent to %s (%s)", pro_email, csv_filename)
+        return True
+    except Exception as exc:
+        logger.error("Failed to send PRO report to %s: %s", pro_email, exc)
+        return False
+
+
 async def send_deadline_warning(
     recipient_email: str,
     recipient_name: str,
