@@ -14,7 +14,7 @@ from uusio.api.dependencies import get_current_user, get_db
 from uusio.core.database import get_db
 from uusio.core.security import hash_password
 from uusio.models.customer import Customer
-from uusio.models.obligation import EPRObligation
+from uusio.models.obligation import EPRObligation, ReportingDeadline
 from uusio.models.pro_registry import CustomerPRORegistration, PROOrganisation
 from uusio.models.product import Product
 from uusio.models.submission import PROSubmission
@@ -57,6 +57,10 @@ def _contract_out(reg: CustomerPRORegistration, pro: PROOrganisation) -> dict:
         "status": reg.status,
         "validFrom": reg.contract_start.isoformat() if reg.contract_start else None,
         "validTo": reg.contract_end.isoformat() if reg.contract_end else None,
+        "submissionMethod": pro.submission_method,
+        "submissionEmail": pro.submission_email,
+        "submissionApiUrl": pro.submission_api_url,
+        "submissionNotes": pro.submission_notes,
     }
 
 
@@ -71,6 +75,7 @@ async def admin_overview(admin: AdminUser, db: Annotated[AsyncSession, Depends(g
         select(func.count()).select_from(Customer).where(Customer.is_active == True)  # noqa: E712
     )).scalar()
     total_contracts = (await db.execute(select(func.count()).select_from(CustomerPRORegistration))).scalar()
+
     return {
         "totalCustomers": total_customers,
         "activeCustomers": active_customers,
@@ -223,7 +228,7 @@ async def create_pro_contract(
     c = (await db.execute(select(Customer).where(Customer.id == org_id))).scalar_one_or_none()
     if not c:
         raise HTTPException(status_code=404, detail="Organization not found")
-    from datetime import date
+
     category = body.materialCategories[0] if body.materialCategories else "packaging"
     pro_key = f"{body.proName.lower().replace(' ', '-')}-{body.country.lower()}-{uuid.uuid4().hex[:6]}"
     pro = PROOrganisation(
@@ -235,6 +240,8 @@ async def create_pro_contract(
     )
     db.add(pro)
     await db.flush()
+
+    from datetime import date
     reg = CustomerPRORegistration(
         customer_id=org_id,
         pro_id=pro.id,
@@ -297,6 +304,56 @@ async def delete_pro_contract(
 
 
 # ---------------------------------------------------------------------------
+# PRO Submission configuration
+# ---------------------------------------------------------------------------
+
+class ProSubmissionConfig(BaseModel):
+    submissionMethod: str | None = None   # email | api | portal | manual
+    submissionEmail: str | None = None
+    submissionApiUrl: str | None = None
+    submissionApiKey: str | None = None   # plaintext; stored encrypted
+    submissionNotes: str | None = None
+
+
+@router.patch("/pro-contracts/{contract_id}/submission-config")
+async def update_pro_submission_config(
+    contract_id: uuid.UUID,
+    body: ProSubmissionConfig,
+    admin: AdminUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Configure how reports are submitted to a specific PRO.
+
+    Called when onboarding a new PRO to define whether submissions happen
+    via email, API, portal upload, or manual process.
+    """
+    row = (await db.execute(
+        select(CustomerPRORegistration, PROOrganisation)
+        .join(PROOrganisation, CustomerPRORegistration.pro_id == PROOrganisation.id)
+        .where(CustomerPRORegistration.id == contract_id)
+    )).one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Contract not found")
+    reg, pro = row
+
+    if body.submissionMethod is not None:
+        pro.submission_method = body.submissionMethod
+    if body.submissionEmail is not None:
+        pro.submission_email = body.submissionEmail
+    if body.submissionApiUrl is not None:
+        pro.submission_api_url = body.submissionApiUrl
+    if body.submissionApiKey is not None:
+        from uusio.core.security import encrypt_config
+        pro.submission_api_key_encrypted = encrypt_config({"key": body.submissionApiKey})
+    if body.submissionNotes is not None:
+        pro.submission_notes = body.submissionNotes
+
+    await db.commit()
+    await db.refresh(pro)
+    return _contract_out(reg, pro)
+
+
+# ---------------------------------------------------------------------------
 # Legacy endpoints (kept for backwards compat)
 # ---------------------------------------------------------------------------
 
@@ -327,9 +384,13 @@ async def list_customers(admin: AdminUser, db: Annotated[AsyncSession, Depends(g
             select(func.count()).select_from(User).where(User.customer_id == c.id)
         )).scalar()
         result.append({
-            "id": str(c.id), "name": c.name, "vat_number": c.vat_number,
-            "country_code": c.country_of_incorporation, "is_active": c.is_active,
-            "user_count": user_count, "created_at": c.created_at.isoformat(),
+            "id": str(c.id),
+            "name": c.name,
+            "vat_number": c.vat_number,
+            "country_code": c.country_of_incorporation,
+            "is_active": c.is_active,
+            "user_count": user_count,
+            "created_at": c.created_at.isoformat(),
         })
     return result
 

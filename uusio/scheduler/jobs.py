@@ -8,7 +8,6 @@ SQLAlchemy async_sessionmaker.  Call shutdown_scheduler() on app shutdown.
 
 Schedule:
   - deadline_check: daily at 08:00 UTC
-  - regulation_monitor: weekly Sundays at 06:00 UTC
 """
 
 from __future__ import annotations
@@ -21,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from uusio.scheduler.deadline_checker import check_upcoming_deadlines
 from uusio.scheduler.regulation_monitor import fetch_regulation_updates
+from uusio.scheduler.invoice_generator import generate_monthly_invoices, generate_annual_invoices
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +51,28 @@ def setup_scheduler(session_factory: async_sessionmaker[AsyncSession]) -> AsyncI
         trigger=CronTrigger(day_of_week="sun", hour=6, minute=0, timezone="UTC"),
         id="regulation_monitor",
         name="Weekly EPR regulation update fetch",
+        args=[session_factory],
+        replace_existing=True,
+        misfire_grace_time=3600,
+    )
+
+    # Monthly invoice generation — 1st of each month at 07:00 UTC
+    scheduler.add_job(
+        generate_monthly_invoices,
+        trigger=CronTrigger(day=1, hour=7, minute=0, timezone="UTC"),
+        id="monthly_invoices",
+        name="Monthly material fee invoice generation",
+        args=[session_factory],
+        replace_existing=True,
+        misfire_grace_time=3600,
+    )
+
+    # Annual invoice generation — 1st January at 07:30 UTC
+    scheduler.add_job(
+        generate_annual_invoices,
+        trigger=CronTrigger(month=1, day=1, hour=7, minute=30, timezone="UTC"),
+        id="annual_invoices",
+        name="Annual PRO membership fee invoice generation",
         args=[session_factory],
         replace_existing=True,
         misfire_grace_time=3600,

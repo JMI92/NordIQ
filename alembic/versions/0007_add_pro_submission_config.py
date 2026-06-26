@@ -14,11 +14,14 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # PRO submission method and contact config
     op.add_column("pro_organisations", sa.Column("submission_method", sa.String(20), nullable=True))
     op.add_column("pro_organisations", sa.Column("submission_email", sa.String(255), nullable=True))
     op.add_column("pro_organisations", sa.Column("submission_api_url", sa.String(500), nullable=True))
     op.add_column("pro_organisations", sa.Column("submission_api_key_encrypted", sa.Text, nullable=True))
     op.add_column("pro_organisations", sa.Column("submission_notes", sa.Text, nullable=True))
+
+    # Import jobs — add filename column for tracking uploaded files
     op.add_column("import_jobs", sa.Column("original_filename", sa.String(500), nullable=True))
     op.add_column("import_jobs", sa.Column("ai_notes", sa.Text, nullable=True))
 

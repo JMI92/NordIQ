@@ -40,9 +40,6 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         settings.frontend_url,
-        "https://app.uusio.io",
-        "https://www.uusio.io",
-        "https://uusio.io",
         "http://localhost:3000",
         "http://localhost:5173",
     ],
@@ -54,8 +51,8 @@ app.add_middleware(
 
 from uusio.api.routers import (  # noqa: E402
     admin, auth, billing, calculations, customers,
-    data_sources, packaging, portal, pro_registry,
-    products, regulations, submissions, audit, volumes,
+    data_sources, packaging, portal, pro_pricing, pro_registry,
+    products, regulations, submissions, audit, volumes, uploads,
 )
 
 app.include_router(auth.router,         prefix="/api/v1/auth",                 tags=["auth"])
@@ -70,8 +67,10 @@ app.include_router(admin.router,        prefix="/api/v1/admin",                t
 app.include_router(billing.router,      prefix="/api/v1/billing",              tags=["billing"])
 app.include_router(regulations.router,  prefix="/api/v1/regulations",          tags=["regulations"])
 app.include_router(pro_registry.router, prefix="/api/v1/pro-registry",         tags=["pro-registry"])
+app.include_router(pro_pricing.router,  prefix="/api/v1/pro-pricing",          tags=["pro-pricing"])
 app.include_router(portal.router,       prefix="/api/v1/portal",               tags=["portal"])
 app.include_router(volumes.router,      prefix="/api/v1",                      tags=["volumes"])
+app.include_router(uploads.router,      prefix="/api/v1/imports",              tags=["imports"])
 
 
 @app.get("/health", tags=["health"])

@@ -198,12 +198,14 @@ async def _run_gap_analysis(session: AsyncSession) -> None:
     For each gap found, inserts a placeholder RegulationEntry tagged 'gap' and 'urgent'
     so it surfaces immediately in the UI as something needing attention.
     """
+    # All active PRO registrations with their PRO org info
     rows = (await session.execute(
         select(CustomerPRORegistration, PROOrganisation)
         .join(PROOrganisation, CustomerPRORegistration.pro_id == PROOrganisation.id)
         .where(CustomerPRORegistration.status == "active")
     )).all()
 
+    # Collect unique (country_code, category) pairs from active contracts
     covered_combos: set[tuple[str, str]] = set()
     for reg, pro in rows:
         categories = reg.material_categories or [pro.category]
@@ -213,6 +215,7 @@ async def _run_gap_analysis(session: AsyncSession) -> None:
     if not covered_combos:
         return
 
+    # Find which combos already have at least one active regulation entry
     existing = (await session.execute(
         select(RegulationEntry.country_code, RegulationEntry.category)
         .where(RegulationEntry.is_active == True)  # noqa: E712
@@ -227,6 +230,7 @@ async def _run_gap_analysis(session: AsyncSession) -> None:
     logger.warning("regulation_monitor: gap analysis — %d uncovered combo(s): %s", len(gaps), gaps)
 
     for country_code, category in gaps:
+        # Check if we already have a gap placeholder for this combo
         existing_gap = (await session.execute(
             select(RegulationEntry).where(
                 RegulationEntry.country_code == country_code,
@@ -313,7 +317,7 @@ async def fetch_regulation_updates(session_factory: async_sessionmaker[AsyncSess
                 if "urgent" in item["tags"]:
                     urgent_count += 1
             else:
-                # Update urgency tag on existing entry if it has become acute
+                # Update urgency tag on existing entry if it has become urgent
                 if "urgent" in item["tags"] and "urgent" not in (existing.tags or []):
                     existing.tags = list(existing.tags or []) + ["urgent"]
 

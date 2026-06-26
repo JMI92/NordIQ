@@ -26,7 +26,8 @@ from uusio.api.dependencies import get_current_user, get_db
 from uusio.core.config import get_settings
 from uusio.models.audit import ImportJob
 from uusio.models.enums import DataSourceType, ImportJobStatus
-from uusio.models.product import Product
+from uusio.models.packaging import PackagingComponent
+from uusio.models.product import Product, ProductWeight
 from uusio.models.user import User
 from uusio.models.volumes import MonthlySalesVolume, ProductMaterialComposition
 
@@ -74,6 +75,7 @@ Respond with ONLY the JSON object, no other text."""
             messages=[{"role": "user", "content": prompt}],
         )
         raw = message.content[0].text.strip()
+        # Strip markdown code block if present
         if raw.startswith("```"):
             raw = raw.split("```")[1]
             if raw.startswith("json"):
@@ -93,6 +95,7 @@ async def _upsert_data(session: AsyncSession, customer_id: uuid.UUID, analysis: 
     inserted = 0
     failed = 0
 
+    # Products
     for p in analysis.get("products") or []:
         try:
             name = (p.get("name") or "").strip()
@@ -118,6 +121,7 @@ async def _upsert_data(session: AsyncSession, customer_id: uuid.UUID, analysis: 
 
     await session.flush()
 
+    # Volumes — need to look up product ids
     for v in analysis.get("volumes") or []:
         try:
             product_name = (v.get("product_name") or "").strip()
@@ -154,6 +158,7 @@ async def _upsert_data(session: AsyncSession, customer_id: uuid.UUID, analysis: 
             logger.warning("uploads: failed to insert volume %s: %s", v, exc)
             failed += 1
 
+    # Packaging compositions
     for pk in analysis.get("packaging") or []:
         try:
             product_name = (pk.get("product_name") or "").strip()
@@ -215,6 +220,7 @@ async def _process_upload(
         await session.commit()
 
     try:
+        # Parse file
         ext = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
         if ext in (".xlsx", ".xls"):
             df = pd.read_excel(io.BytesIO(file_bytes))

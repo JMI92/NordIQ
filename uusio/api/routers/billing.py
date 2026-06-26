@@ -32,14 +32,20 @@ def _invoice_dict(inv: Invoice) -> dict:
         "id": str(inv.id),
         "customer_id": str(inv.customer_id),
         "invoice_number": inv.invoice_number,
+        "invoice_type": inv.invoice_type,
         "amount": float(inv.amount),
+        "service_fee": float(inv.service_fee),
         "currency": inv.currency,
         "status": inv.status,
+        "period_start": inv.period_start.isoformat() if inv.period_start else None,
+        "period_end": inv.period_end.isoformat() if inv.period_end else None,
         "due_date": inv.due_date.isoformat() if inv.due_date else None,
         "sent_at": inv.sent_at.isoformat() if inv.sent_at else None,
         "paid_at": inv.paid_at.isoformat() if inv.paid_at else None,
         "notes": inv.notes,
         "line_items": inv.line_items or [],
+        "accounting_ref": inv.accounting_ref,
+        "accounting_exported_at": inv.accounting_exported_at.isoformat() if inv.accounting_exported_at else None,
         "created_at": inv.created_at.isoformat(),
     }
 
@@ -47,8 +53,12 @@ def _invoice_dict(inv: Invoice) -> dict:
 class InvoiceCreate(BaseModel):
     customer_id: uuid.UUID
     invoice_number: str
+    invoice_type: str = "manual"
     amount: Decimal
+    service_fee: Decimal = Decimal("30.00")
     currency: str = "EUR"
+    period_start: str | None = None
+    period_end: str | None = None
     due_date: str | None = None
     notes: str | None = None
     line_items: list | None = None
@@ -86,7 +96,9 @@ async def create_invoice(
     inv = Invoice(
         customer_id=body.customer_id,
         invoice_number=body.invoice_number,
+        invoice_type=body.invoice_type,
         amount=body.amount,
+        service_fee=body.service_fee,
         currency=body.currency,
         notes=body.notes,
         line_items=body.line_items,
@@ -94,6 +106,10 @@ async def create_invoice(
     )
     if body.due_date:
         inv.due_date = date.fromisoformat(body.due_date)
+    if body.period_start:
+        inv.period_start = date.fromisoformat(body.period_start)
+    if body.period_end:
+        inv.period_end = date.fromisoformat(body.period_end)
     db.add(inv)
     await db.commit()
     await db.refresh(inv)
@@ -136,3 +152,62 @@ async def delete_invoice(
         raise HTTPException(status_code=404, detail="Invoice not found")
     await db.delete(inv)
     await db.commit()
+
+
+@router.post("/generate/monthly", status_code=202)
+async def trigger_monthly_generation(
+    admin: AdminUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Manually trigger monthly invoice generation (runs automatically on 1st of month)."""
+    import asyncio
+    from uusio.core.database import async_session_factory
+    from uusio.scheduler.invoice_generator import generate_monthly_invoices
+    asyncio.create_task(generate_monthly_invoices(async_session_factory))
+    return {"status": "accepted", "message": "Monthly invoice generation started in background"}
+
+
+@router.post("/generate/annual", status_code=202)
+async def trigger_annual_generation(
+    admin: AdminUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Manually trigger annual invoice generation (runs automatically on 1 Jan)."""
+    import asyncio
+    from uusio.core.database import async_session_factory
+    from uusio.scheduler.invoice_generator import generate_annual_invoices
+    asyncio.create_task(generate_annual_invoices(async_session_factory))
+    return {"status": "accepted", "message": "Annual invoice generation started in background"}
+
+
+@router.post("/{invoice_id}/export-accounting", status_code=200)
+async def export_to_accounting(
+    invoice_id: uuid.UUID,
+    admin: AdminUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Placeholder: export invoice data to accounting software (Procountor/Xero).
+
+    When accounting software is chosen, implement the actual API call here.
+    Returns structured invoice data ready for import.
+    """
+    inv = (await db.execute(select(Invoice).where(Invoice.id == invoice_id))).scalar_one_or_none()
+    if not inv:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    # Structured export payload — adapt to target accounting software format
+    export_payload = {
+        "invoice_number": inv.invoice_number,
+        "invoice_type": inv.invoice_type,
+        "customer_id": str(inv.customer_id),
+        "period_start": inv.period_start.isoformat() if inv.period_start else None,
+        "period_end": inv.period_end.isoformat() if inv.period_end else None,
+        "due_date": inv.due_date.isoformat() if inv.due_date else None,
+        "currency": inv.currency,
+        "line_items": inv.line_items or [],
+        "total_excl_vat": float(inv.amount),
+        "status": "ready_for_accounting",
+        "note": "Accounting integration not yet configured. Connect Procountor or Xero to enable automatic export.",
+    }
+
+    return export_payload
