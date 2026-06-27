@@ -227,7 +227,7 @@ async def _get_margin_for_pro(db: AsyncSession, pro_id: uuid.UUID) -> Decimal:
             .limit(1)
         )
     ).scalar_one_or_none()
-    return row.margin_percentage if row else Decimal("12.00")
+    return row.margin_percentage if row else Decimal("15.00")
 
 
 @router.get("/customer-pricing")

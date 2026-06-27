@@ -50,7 +50,7 @@ app.add_middleware(
 )
 
 from uusio.api.routers import (  # noqa: E402
-    admin, auth, billing, calculations, customers,
+    admin, auth, billing, calculations, chat, customers,
     data_sources, packaging, portal, pro_pricing, pro_registry,
     products, regulations, submissions, audit, volumes, uploads,
 )
@@ -71,6 +71,7 @@ app.include_router(pro_pricing.router,  prefix="/api/v1/pro-pricing",          t
 app.include_router(portal.router,       prefix="/api/v1/portal",               tags=["portal"])
 app.include_router(volumes.router,      prefix="/api/v1",                      tags=["volumes"])
 app.include_router(uploads.router,      prefix="/api/v1/imports",              tags=["imports"])
+app.include_router(chat.router,          prefix="/api/v1/chat",                 tags=["chat"])
 
 
 @app.get("/health", tags=["health"])
