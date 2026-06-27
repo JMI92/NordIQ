@@ -344,7 +344,7 @@ async def update_pro_invoice(
 # Margin reconciliation
 # ---------------------------------------------------------------------------
 
-EXPECTED_MARGIN_PCT = Decimal("12.00")   # matches MarginSettings default
+EXPECTED_MARGIN_PCT = Decimal("15.00")   # matches MarginSettings default
 MARGIN_TOLERANCE_PCT = Decimal("3.00")   # warn if actual margin deviates more than this
 
 

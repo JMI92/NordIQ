@@ -2,13 +2,13 @@
 
 Monthly (1st of each month):
   - Material reporting fees based on EPR obligations for the previous month
-  - Margin applied to material fees only
-  - €30 service fee per invoice
+  - 15% margin applied to material fees only
+  - €30 service fee once per consolidated monthly invoice (not per PRO)
 
 Annual (1st January):
   - PRO annual membership fees for all active customer PRO registrations
   - Passed through at cost (no margin)
-  - €30 service fee per invoice
+  - €30 service fee once per consolidated annual invoice
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 logger = logging.getLogger(__name__)
 
 SERVICE_FEE = Decimal("30.00")
-DEFAULT_MARGIN = Decimal("12.00")
+DEFAULT_MARGIN = Decimal("15.00")
 INVOICE_DUE_DAYS = 14
 
 
