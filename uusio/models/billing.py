@@ -55,3 +55,57 @@ class Invoice(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     def __repr__(self) -> str:
         return f"<Invoice {self.invoice_number} [{self.invoice_type}/{self.status}] {self.amount} {self.currency}>"
+
+
+class PROInvoice(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Incoming invoice received from a PRO organisation.
+
+    These are the costs we (or our customer) pay to PROs. Recording them
+    allows margin reconciliation: customer invoice - PRO invoice = actual margin.
+
+    invoice_type mirrors Invoice.invoice_type:
+      - monthly       material fee invoices from PRO
+      - annual        yearly membership / compliance fee from PRO
+      - registration  one-time registration fee from PRO
+    """
+
+    __tablename__ = "pro_invoices"
+
+    pro_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("pro_organisations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    customer_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("customers.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    # The outgoing customer invoice this PRO invoice corresponds to (optional)
+    customer_invoice_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("invoices.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    pro_invoice_number: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    invoice_type: Mapped[str] = mapped_column(String(20), nullable=False, default="monthly", index=True)
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="EUR")
+    period_start: Mapped[date | None] = mapped_column(Date, nullable=True)
+    period_end: Mapped[date | None] = mapped_column(Date, nullable=True)
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # received / paid / disputed
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="received", index=True)
+    received_at: Mapped[date | None] = mapped_column(Date, nullable=True)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Raw line items from PRO invoice for reference
+    line_items: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+
+    customer: Mapped["Customer"] = relationship("Customer")  # type: ignore[name-defined]
+
+    def __repr__(self) -> str:
+        return f"<PROInvoice {self.pro_invoice_number} [{self.invoice_type}/{self.status}] {self.amount} {self.currency}>"
