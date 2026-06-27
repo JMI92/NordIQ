@@ -354,6 +354,202 @@ async def update_pro_submission_config(
 
 
 # ---------------------------------------------------------------------------
+# Onboarding: create customer + first user in one call
+# ---------------------------------------------------------------------------
+
+class OnboardCustomerBody(BaseModel):
+    # Customer fields
+    company_name: str
+    country_of_incorporation: str          # 2-letter ISO, e.g. "FI"
+    vat_number: str | None = None
+    contact_email: str | None = None
+    # First user
+    user_email: str
+    user_full_name: str | None = None
+    user_is_admin: bool = False
+
+
+@router.post("/onboard-customer", status_code=status.HTTP_201_CREATED)
+async def onboard_customer(
+    body: OnboardCustomerBody,
+    admin: AdminUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Create a new customer and their first user account in one call.
+
+    Returns the customer record plus a temporary password for the user.
+    Send the temporary password to the user out-of-band — it is shown only once.
+    """
+    existing = (await db.execute(select(User).where(User.email == body.user_email))).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=409, detail="A user with that email already exists")
+
+    customer = Customer(
+        name=body.company_name,
+        country_of_incorporation=body.country_of_incorporation.upper(),
+        vat_number=body.vat_number or None,
+        contact_email=body.contact_email or None,
+        is_active=True,
+    )
+    db.add(customer)
+    await db.flush()
+
+    temp_password = "".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(16))
+    user = User(
+        customer_id=customer.id,
+        email=body.user_email,
+        hashed_password=hash_password(temp_password),
+        full_name=body.user_full_name or body.user_email.split("@")[0],
+        is_active=True,
+        is_admin=body.user_is_admin,
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(customer)
+    await db.refresh(user)
+
+    return {
+        "customer": _org_out(customer),
+        "user": {
+            "id": str(user.id),
+            "email": user.email,
+            "full_name": user.full_name,
+            "is_admin": user.is_admin,
+        },
+        "temporary_password": temp_password,
+        "onboarding_status_url": f"/api/v1/admin/customers/{customer.id}/onboarding-status",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Onboarding status — shows what's complete and what's missing per customer
+# ---------------------------------------------------------------------------
+
+@router.get("/customers/{customer_id}/onboarding-status")
+async def get_onboarding_status(
+    customer_id: uuid.UUID,
+    admin: AdminUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Return a checklist of onboarding steps for a customer.
+
+    Each step has: done (bool), count (int where relevant), detail (str).
+    Use this to quickly see what's missing before a customer goes live.
+    """
+    from uusio.models.billing import Invoice
+    from uusio.models.packaging import PackagingComponent
+
+    c = (await db.execute(select(Customer).where(Customer.id == customer_id))).scalar_one_or_none()
+    if not c:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    users = (await db.execute(
+        select(func.count()).select_from(User).where(User.customer_id == customer_id)
+    )).scalar() or 0
+
+    products = (await db.execute(
+        select(func.count()).select_from(Product).where(Product.customer_id == customer_id)
+    )).scalar() or 0
+
+    pro_regs = (await db.execute(
+        select(func.count()).select_from(CustomerPRORegistration)
+        .where(CustomerPRORegistration.customer_id == customer_id, CustomerPRORegistration.status == "active")
+    )).scalar() or 0
+
+    obligations = (await db.execute(
+        select(func.count()).select_from(EPRObligation)
+        .where(EPRObligation.customer_id == customer_id)
+    )).scalar() or 0
+
+    calculated = (await db.execute(
+        select(func.count()).select_from(EPRObligation)
+        .where(EPRObligation.customer_id == customer_id, EPRObligation.status == "calculated")
+    )).scalar() or 0
+
+    submitted = (await db.execute(
+        select(func.count()).select_from(EPRObligation)
+        .where(EPRObligation.customer_id == customer_id, EPRObligation.status == "submitted")
+    )).scalar() or 0
+
+    invoices = (await db.execute(
+        select(func.count()).select_from(Invoice).where(Invoice.customer_id == customer_id)
+    )).scalar() or 0
+
+    packaging = (await db.execute(
+        select(func.count()).select_from(PackagingComponent)
+        .where(PackagingComponent.customer_id == customer_id)
+    )).scalar() or 0
+
+    steps = [
+        {
+            "step": "customer_created",
+            "label": "Customer account created",
+            "done": True,
+            "detail": c.name,
+        },
+        {
+            "step": "user_created",
+            "label": "First user account created",
+            "done": users > 0,
+            "count": users,
+            "detail": f"{users} user(s)" if users else "No users yet — use /admin/onboard-customer or /admin/organizations/{customer_id}/invite",
+        },
+        {
+            "step": "pro_registrations",
+            "label": "PRO registrations configured",
+            "done": pro_regs > 0,
+            "count": pro_regs,
+            "detail": f"{pro_regs} active registration(s)" if pro_regs else "No PRO registrations — add via /admin/organizations/{customer_id}/pro-contracts",
+        },
+        {
+            "step": "products_entered",
+            "label": "Products entered",
+            "done": products > 0,
+            "count": products,
+            "detail": f"{products} product(s)" if products else "No products — customer must enter products via the portal",
+        },
+        {
+            "step": "packaging_components",
+            "label": "Packaging components defined",
+            "done": packaging > 0,
+            "count": packaging,
+            "detail": f"{packaging} packaging component(s)" if packaging else "No packaging components defined",
+        },
+        {
+            "step": "obligations_created",
+            "label": "EPR obligations created",
+            "done": obligations > 0,
+            "count": obligations,
+            "detail": f"{obligations} obligation(s) total, {calculated} calculated, {submitted} submitted",
+        },
+        {
+            "step": "first_calculation",
+            "label": "First EPR calculation run",
+            "done": calculated > 0 or submitted > 0,
+            "detail": f"{calculated} calculated, {submitted} submitted" if (calculated or submitted) else "No calculations yet — trigger via /api/v1/calculations",
+        },
+        {
+            "step": "invoicing",
+            "label": "Invoicing active",
+            "done": invoices > 0,
+            "count": invoices,
+            "detail": f"{invoices} invoice(s) generated" if invoices else "No invoices yet — runs automatically on 1st of month",
+        },
+    ]
+
+    completed = sum(1 for s in steps if s["done"])
+    return {
+        "customer_id": str(customer_id),
+        "customer_name": c.name,
+        "is_active": c.is_active,
+        "completed_steps": completed,
+        "total_steps": len(steps),
+        "ready_for_live": completed == len(steps),
+        "steps": steps,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Legacy endpoints (kept for backwards compat)
 # ---------------------------------------------------------------------------
 
