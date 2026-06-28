@@ -1,6 +1,6 @@
 """Add PRO pricing, margin settings and extend invoices for automated billing
 
-Revision ID: 0008
+Revision ID: 0008_add_pro_pricing_billing
 Revises: 0007
 Create Date: 2026-06-26
 """
@@ -8,7 +8,7 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID
 
-revision = "0008"
+revision = "0008_add_pro_pricing_billing"
 down_revision = "0007"
 branch_labels = None
 depends_on = None
