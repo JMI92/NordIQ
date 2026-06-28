@@ -32,7 +32,8 @@ from uusio.models.regulation import RegulationEntry
 
 logger = logging.getLogger(__name__)
 
-URGENCY_DAYS = 90  # effective_date within this many days → "urgent"
+URGENCY_DAYS = 90   # effective_date within this many days → "urgent"
+RATE_STALE_DAYS = 180  # warn if EPR rates haven't been updated in this many days
 
 
 class RegulationItem(TypedDict):
@@ -189,6 +190,67 @@ def _is_epr_relevant(item: RegulationItem) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Rate staleness check
+# ---------------------------------------------------------------------------
+
+async def _check_rate_staleness(session: AsyncSession) -> None:
+    """Warn if EPR rates for any active country haven't been updated recently.
+
+    Creates a RegulationEntry tagged 'stale-rates' so it surfaces in the UI
+    and reminds the admin to verify rates with PROs before next billing cycle.
+    """
+    from uusio.models.obligation import EPRRate
+
+    today = date.today()
+    stale_cutoff = today - timedelta(days=RATE_STALE_DAYS)
+
+    # Find the most recent valid_from per country+category
+    from sqlalchemy import func
+    rows = (await session.execute(
+        select(EPRRate.country_code, EPRRate.product_category,
+               func.max(EPRRate.valid_from).label("latest"))
+        .where(EPRRate.valid_to.is_(None))  # currently active rates
+        .group_by(EPRRate.country_code, EPRRate.product_category)
+    )).all()
+
+    for row in rows:
+        if row.latest and row.latest < stale_cutoff:
+            age_days = (today - row.latest).days
+            tag_key = f"stale-rates-{row.country_code}-{row.product_category}"
+
+            existing = (await session.execute(
+                select(RegulationEntry).where(
+                    RegulationEntry.country_code == row.country_code,
+                    RegulationEntry.category == row.product_category,
+                    RegulationEntry.tags.contains(["stale-rates"]),
+                    RegulationEntry.is_active == True,  # noqa: E712
+                )
+            )).scalar_one_or_none()
+
+            if existing is None:
+                entry = RegulationEntry(
+                    country_code=row.country_code,
+                    category=row.product_category,
+                    title=f"⚠️ EPR rates may be outdated: {row.country_code} / {row.product_category}",
+                    summary=(
+                        f"The EPR rates for {row.country_code} ({row.product_category}) "
+                        f"were last updated {age_days} days ago (valid_from: {row.latest}). "
+                        f"PROs typically update rates annually. Please verify current rates "
+                        f"with the PRO and update via /api/v1/regulations if needed."
+                    ),
+                    source_url=None,
+                    tags=["stale-rates", "action-required"],
+                    effective_date=None,
+                    is_active=True,
+                )
+                session.add(entry)
+                logger.warning(
+                    "regulation_monitor: rates stale for %s/%s (last updated %s, %d days ago)",
+                    row.country_code, row.product_category, row.latest, age_days,
+                )
+
+
+# ---------------------------------------------------------------------------
 # Gap analysis
 # ---------------------------------------------------------------------------
 
@@ -322,6 +384,7 @@ async def fetch_regulation_updates(session_factory: async_sessionmaker[AsyncSess
                     existing.tags = list(existing.tags or []) + ["urgent"]
 
         await _run_gap_analysis(session)
+        await _check_rate_staleness(session)
         await session.commit()
 
         logger.info(
