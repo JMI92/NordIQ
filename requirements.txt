@@ -43,6 +43,9 @@ httpx==0.27.0
 # AI
 anthropic>=0.30.0
 
+# Rate limiting
+slowapi==0.1.9
+
 # Environment
 python-dotenv==1.0.1
 

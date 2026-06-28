@@ -22,10 +22,21 @@ from uusio.scheduler.deadline_checker import check_upcoming_deadlines
 from uusio.scheduler.regulation_monitor import fetch_regulation_updates
 from uusio.scheduler.invoice_generator import generate_monthly_invoices, generate_annual_invoices
 from uusio.scheduler.auto_submitter import auto_submit_reports
+from uusio.scheduler.lock import (
+    pg_advisory_lock,
+    LOCK_DEADLINE_CHECK, LOCK_REGULATION_FETCH,
+    LOCK_MONTHLY_INVOICES, LOCK_ANNUAL_INVOICES, LOCK_AUTO_SUBMIT,
+)
 
 logger = logging.getLogger(__name__)
 
 _scheduler: AsyncIOScheduler | None = None
+
+
+async def _locked(fn, session_factory, lock_id: int) -> None:
+    async with pg_advisory_lock(session_factory, lock_id) as acquired:
+        if acquired:
+            await fn(session_factory)
 
 
 def setup_scheduler(session_factory: async_sessionmaker[AsyncSession]) -> AsyncIOScheduler:
@@ -38,56 +49,38 @@ def setup_scheduler(session_factory: async_sessionmaker[AsyncSession]) -> AsyncI
     scheduler = AsyncIOScheduler(timezone="UTC")
 
     scheduler.add_job(
-        check_upcoming_deadlines,
+        _locked, args=[check_upcoming_deadlines, session_factory, LOCK_DEADLINE_CHECK],
         trigger=CronTrigger(hour=8, minute=0, timezone="UTC"),
-        id="deadline_check",
-        name="Daily EPR deadline warning check",
-        args=[session_factory],
-        replace_existing=True,
-        misfire_grace_time=3600,
+        id="deadline_check", name="Daily EPR deadline warning check",
+        replace_existing=True, misfire_grace_time=3600,
     )
 
     scheduler.add_job(
-        fetch_regulation_updates,
+        _locked, args=[fetch_regulation_updates, session_factory, LOCK_REGULATION_FETCH],
         trigger=CronTrigger(day_of_week="sun", hour=6, minute=0, timezone="UTC"),
-        id="regulation_monitor",
-        name="Weekly EPR regulation update fetch",
-        args=[session_factory],
-        replace_existing=True,
-        misfire_grace_time=3600,
+        id="regulation_monitor", name="Weekly EPR regulation update fetch",
+        replace_existing=True, misfire_grace_time=3600,
     )
 
-    # Monthly invoice generation — 1st of each month at 07:00 UTC
     scheduler.add_job(
-        generate_monthly_invoices,
+        _locked, args=[generate_monthly_invoices, session_factory, LOCK_MONTHLY_INVOICES],
         trigger=CronTrigger(day=1, hour=7, minute=0, timezone="UTC"),
-        id="monthly_invoices",
-        name="Monthly material fee invoice generation",
-        args=[session_factory],
-        replace_existing=True,
-        misfire_grace_time=3600,
+        id="monthly_invoices", name="Monthly material fee invoice generation",
+        replace_existing=True, misfire_grace_time=3600,
     )
 
-    # Annual invoice generation — 1st January at 07:30 UTC
     scheduler.add_job(
-        generate_annual_invoices,
+        _locked, args=[generate_annual_invoices, session_factory, LOCK_ANNUAL_INVOICES],
         trigger=CronTrigger(month=1, day=1, hour=7, minute=30, timezone="UTC"),
-        id="annual_invoices",
-        name="Annual PRO membership fee invoice generation",
-        args=[session_factory],
-        replace_existing=True,
-        misfire_grace_time=3600,
+        id="annual_invoices", name="Annual PRO membership fee invoice generation",
+        replace_existing=True, misfire_grace_time=3600,
     )
 
-    # Auto-submit EPR reports to PROs daily at 09:00 UTC
     scheduler.add_job(
-        auto_submit_reports,
+        _locked, args=[auto_submit_reports, session_factory, LOCK_AUTO_SUBMIT],
         trigger=CronTrigger(hour=9, minute=0, timezone="UTC"),
-        id="auto_submit_reports",
-        name="Daily automatic EPR report submission to PROs",
-        args=[session_factory],
-        replace_existing=True,
-        misfire_grace_time=3600,
+        id="auto_submit_reports", name="Daily automatic EPR report submission to PROs",
+        replace_existing=True, misfire_grace_time=3600,
     )
 
     scheduler.start()
