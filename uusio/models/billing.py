@@ -1,4 +1,4 @@
-"""Billing / invoice model."""
+"""Billing / invoice models."""
 
 import uuid
 from datetime import date, datetime

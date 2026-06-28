@@ -31,6 +31,7 @@ router = APIRouter()
 
 MODEL = "claude-sonnet-4-6"
 MAX_TOKENS = 1024
+HISTORY_WINDOW = 40  # messages to load from DB (20 exchanges)
 
 # ---------------------------------------------------------------------------
 # System prompts
@@ -240,7 +241,14 @@ async def portal_chat(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """Portal compliance assistant — requires authentication."""
+    """Portal compliance assistant — requires authentication.
+
+    Conversation history is persisted in the database so the assistant
+    remembers previous sessions. The last HISTORY_WINDOW messages are
+    loaded automatically; no need to send history from the client.
+    """
+    from sqlalchemy import asc
+    from uusio.models.chat import ChatHistory
     from uusio.models.customer import Customer
 
     settings = get_settings()
@@ -253,8 +261,16 @@ async def portal_chat(
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
 
-    customer_context = await _build_customer_context(current_user.customer_id, db)
+    # Load persisted history
+    past = (await db.execute(
+        select(ChatHistory)
+        .where(ChatHistory.customer_id == current_user.customer_id)
+        .order_by(ChatHistory.created_at.desc())
+        .limit(HISTORY_WINDOW)
+    )).scalars().all()
+    past = list(reversed(past))  # chronological order
 
+    customer_context = await _build_customer_context(current_user.customer_id, db)
     system_prompt = PORTAL_SYSTEM_PROMPT_TEMPLATE.format(
         customer_name=customer.name,
         today=date.today().isoformat(),
@@ -263,7 +279,7 @@ async def portal_chat(
 
     client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
 
-    messages = [{"role": m.role, "content": m.content} for m in body.history]
+    messages = [{"role": m.role, "content": m.content} for m in past]
     messages.append({"role": "user", "content": body.message})
 
     try:
@@ -278,4 +294,49 @@ async def portal_chat(
         logger.error("Portal chat error for customer %s: %s", customer.id, exc)
         raise HTTPException(status_code=502, detail="AI assistant unavailable")
 
+    # Persist this exchange
+    db.add(ChatHistory(customer_id=current_user.customer_id, role="user", content=body.message))
+    db.add(ChatHistory(customer_id=current_user.customer_id, role="assistant", content=reply))
+    await db.commit()
+
     return ChatResponse(reply=reply, mode="portal")
+
+
+@router.get("/portal/history")
+async def get_chat_history(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    limit: int = 50,
+):
+    """Return recent chat history for the current customer.
+
+    Lets the frontend restore conversation state on page load.
+    """
+    from uusio.models.chat import ChatHistory
+
+    rows = (await db.execute(
+        select(ChatHistory)
+        .where(ChatHistory.customer_id == current_user.customer_id)
+        .order_by(ChatHistory.created_at.desc())
+        .limit(limit)
+    )).scalars().all()
+
+    return [
+        {"role": r.role, "content": r.content, "created_at": r.created_at.isoformat()}
+        for r in reversed(rows)
+    ]
+
+
+@router.delete("/portal/history", status_code=204)
+async def clear_chat_history(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Clear the current customer's chat history."""
+    from sqlalchemy import delete
+    from uusio.models.chat import ChatHistory
+
+    await db.execute(
+        delete(ChatHistory).where(ChatHistory.customer_id == current_user.customer_id)
+    )
+    await db.commit()
