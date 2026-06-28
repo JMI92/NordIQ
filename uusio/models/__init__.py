@@ -12,3 +12,4 @@ from uusio.models.pro_pricing import PRoPricing, MarginSettings  # noqa: F401
 from uusio.models.regulation import RegulationEntry  # noqa: F401
 from uusio.models.pro_registry import PROOrganisation, CustomerPRORegistration  # noqa: F401
 from uusio.models.volumes import ProductMaterialComposition, MonthlySalesVolume  # noqa: F401
+from uusio.models.chat import ChatHistory  # noqa: F401
