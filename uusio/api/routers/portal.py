@@ -11,6 +11,7 @@ from sqlalchemy.orm import selectinload
 from uusio.api.dependencies import get_current_user, get_db
 from uusio.models.obligation import EPRObligation, ReportingDeadline
 from uusio.models.pro_registry import CustomerPRORegistration
+from uusio.models.regulation import RegulationEntry
 from uusio.models.submission import PROSubmission
 from uusio.models.user import User
 
@@ -229,6 +230,230 @@ async def my_reports(
             } if obl else None,
         })
     return result
+
+
+@router.get("/compliance-health")
+async def compliance_health(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Single traffic-light view of the customer's EPR compliance status.
+
+    Returns overall status (green / yellow / red) plus per-issue details
+    so the customer immediately knows if action is needed and what.
+
+    green:  Everything is on track.
+    yellow: Something needs attention soon (deadline within 30 days,
+            obligation not yet calculated, pending submission).
+    red:    Immediate action required (deadline overdue, submission failed,
+            invoice overdue).
+    """
+    from datetime import date, timedelta
+    from uusio.models.billing import Invoice
+    from uusio.models.regulation import RegulationEntry
+
+    today = date.today()
+    customer_id = current_user.customer_id
+    issues: list[dict] = []
+
+    # --- PRO registrations ---
+    regs = (await db.execute(
+        select(CustomerPRORegistration)
+        .options(selectinload(CustomerPRORegistration.pro))
+        .where(CustomerPRORegistration.customer_id == customer_id,
+               CustomerPRORegistration.status == "active")
+    )).scalars().all()
+
+    if not regs:
+        issues.append({
+            "severity": "yellow",
+            "code": "no_pro_registrations",
+            "title": "No PRO registrations configured",
+            "detail": "Add at least one PRO registration to start tracking obligations.",
+            "action": "Contact Uusio support or add via admin panel.",
+        })
+
+    # --- Upcoming deadlines ---
+    active_countries = [r.pro.country_code for r in regs if r.pro]
+    if active_countries:
+        deadlines = (await db.execute(
+            select(ReportingDeadline)
+            .where(
+                ReportingDeadline.country_code.in_(active_countries),
+                ReportingDeadline.submission_deadline >= today,
+                ReportingDeadline.submission_deadline <= today + timedelta(days=60),
+            )
+            .order_by(ReportingDeadline.submission_deadline)
+        )).scalars().all()
+
+        for dl in deadlines:
+            days_left = (dl.submission_deadline - today).days
+
+            # Check if obligation exists and its status
+            obl = (await db.execute(
+                select(EPRObligation).where(
+                    EPRObligation.customer_id == customer_id,
+                    EPRObligation.country_code == dl.country_code,
+                    EPRObligation.reporting_period_start == dl.reporting_period_start,
+                    EPRObligation.reporting_period_end == dl.reporting_period_end,
+                ).limit(1)
+            )).scalar_one_or_none()
+
+            obl_status = obl.status if obl else None
+
+            if obl_status == "submitted":
+                continue  # all good
+
+            if days_left <= 7:
+                severity = "red"
+            elif days_left <= 30:
+                severity = "yellow"
+            else:
+                severity = "yellow"
+
+            if obl_status is None:
+                detail = f"No calculation run yet for this period."
+                action = "Run EPR calculation for this period."
+            elif obl_status == "draft":
+                detail = f"Calculation is in draft — not yet finalised."
+                action = "Finalise and submit the EPR report."
+            elif obl_status == "calculated":
+                detail = f"Calculation done, report not yet submitted."
+                action = "Report will be submitted automatically within 5 days of deadline, or submit manually."
+            else:
+                detail = f"Obligation status: {obl_status}."
+                action = "Review obligation status."
+
+            issues.append({
+                "severity": severity,
+                "code": "deadline_approaching",
+                "title": f"{dl.country_code} {dl.product_category} deadline in {days_left} day(s)",
+                "detail": detail,
+                "action": action,
+                "deadline": dl.submission_deadline.isoformat(),
+                "country_code": dl.country_code,
+                "product_category": dl.product_category,
+                "obligation_status": obl_status,
+            })
+
+    # --- Overdue deadlines (missed) ---
+    if active_countries:
+        overdue = (await db.execute(
+            select(ReportingDeadline)
+            .where(
+                ReportingDeadline.country_code.in_(active_countries),
+                ReportingDeadline.submission_deadline < today,
+                ReportingDeadline.submission_deadline >= today - timedelta(days=90),
+            )
+        )).scalars().all()
+
+        for dl in overdue:
+            obl = (await db.execute(
+                select(EPRObligation).where(
+                    EPRObligation.customer_id == customer_id,
+                    EPRObligation.country_code == dl.country_code,
+                    EPRObligation.reporting_period_start == dl.reporting_period_start,
+                ).limit(1)
+            )).scalar_one_or_none()
+
+            if not obl or obl.status not in ("submitted",):
+                issues.append({
+                    "severity": "red",
+                    "code": "deadline_overdue",
+                    "title": f"{dl.country_code} {dl.product_category} deadline PASSED",
+                    "detail": f"Deadline was {dl.submission_deadline.isoformat()}. Report may not have been submitted.",
+                    "action": "Contact Uusio immediately — late submission may incur fines.",
+                    "deadline": dl.submission_deadline.isoformat(),
+                    "country_code": dl.country_code,
+                    "product_category": dl.product_category,
+                })
+
+    # --- Failed submissions ---
+    failed_subs = (await db.execute(
+        select(PROSubmission).where(
+            PROSubmission.customer_id == customer_id,
+            PROSubmission.status == "failed",
+        ).order_by(PROSubmission.created_at.desc()).limit(5)
+    )).scalars().all()
+
+    for s in failed_subs:
+        issues.append({
+            "severity": "red",
+            "code": "submission_failed",
+            "title": "EPR report submission failed",
+            "detail": s.error_message or "Submission attempt failed — see logs.",
+            "action": "Uusio will retry, or contact support if this persists.",
+            "submission_id": str(s.id),
+        })
+
+    # --- Overdue invoices ---
+    overdue_invoices = (await db.execute(
+        select(Invoice).where(
+            Invoice.customer_id == customer_id,
+            Invoice.status.in_(["sent", "overdue"]),
+            Invoice.due_date < today,
+        )
+    )).scalars().all()
+
+    for inv in overdue_invoices:
+        days_overdue = (today - inv.due_date).days
+        issues.append({
+            "severity": "red",
+            "code": "invoice_overdue",
+            "title": f"Invoice {inv.invoice_number} overdue by {days_overdue} day(s)",
+            "detail": f"{float(inv.amount):.2f} {inv.currency} was due {inv.due_date.isoformat()}.",
+            "action": "Pay invoice to maintain uninterrupted service.",
+            "invoice_id": str(inv.id),
+            "invoice_number": inv.invoice_number,
+        })
+
+    # --- Regulation alerts (urgent / stale-rates) ---
+    if active_countries:
+        from sqlalchemy import or_
+        reg_alerts = (await db.execute(
+            select(RegulationEntry).where(
+                RegulationEntry.country_code.in_(active_countries + ["EU"]),
+                RegulationEntry.is_active == True,  # noqa: E712
+                or_(
+                    RegulationEntry.tags.contains(["urgent"]),
+                    RegulationEntry.tags.contains(["stale-rates"]),
+                    RegulationEntry.tags.contains(["gap"]),
+                    RegulationEntry.tags.contains(["action-required"]),
+                ),
+            ).order_by(RegulationEntry.created_at.desc()).limit(5)
+        )).scalars().all()
+
+        for reg in reg_alerts:
+            is_stale = "stale-rates" in (reg.tags or [])
+            issues.append({
+                "severity": "yellow",
+                "code": "regulation_alert",
+                "title": reg.title,
+                "detail": reg.summary[:300] if reg.summary else "",
+                "action": "Review and update EPR rates if needed." if is_stale else "Review regulation change.",
+                "regulation_id": str(reg.id),
+                "tags": reg.tags,
+            })
+
+    # --- Overall status ---
+    if any(i["severity"] == "red" for i in issues):
+        overall = "red"
+    elif any(i["severity"] == "yellow" for i in issues):
+        overall = "yellow"
+    else:
+        overall = "green"
+
+    return {
+        "status": overall,
+        "status_label": {
+            "green": "All clear — compliance is on track.",
+            "yellow": "Attention needed — review items below.",
+            "red": "Action required — immediate attention needed.",
+        }[overall],
+        "checked_at": today.isoformat(),
+        "issue_count": len(issues),
+        "issues": issues,
+    }
 
 
 @router.get("/files")
