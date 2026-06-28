@@ -1,7 +1,7 @@
 """Add chat_history table for persistent portal assistant memory.
 
 Revision ID: 0012_add_chat_history
-Revises: 0011_update_margin_default_15pct
+Revises: 0011_margin_15pct
 Create Date: 2026-06-28
 """
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID
 
 revision = "0012_add_chat_history"
-down_revision = "0011_update_margin_default_15pct"
+down_revision = "0011_margin_15pct"
 branch_labels = None
 depends_on = None
 

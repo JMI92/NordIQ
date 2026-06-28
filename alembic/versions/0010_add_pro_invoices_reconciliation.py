@@ -1,6 +1,6 @@
 """Add pro_invoices table for incoming PRO invoices and margin reconciliation.
 
-Revision ID: 0010_add_pro_invoices_reconciliation
+Revision ID: 0010_pro_invoices
 Revises: 0009_add_pro_report_format
 Create Date: 2026-06-27
 """
@@ -9,7 +9,7 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
-revision = "0010_add_pro_invoices_reconciliation"
+revision = "0010_pro_invoices"
 down_revision = "0009_add_pro_report_format"
 branch_labels = None
 depends_on = None
