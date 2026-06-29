@@ -43,13 +43,19 @@ httpx==0.27.0
 # AI
 anthropic>=0.30.0
 
+# Rate limiting
+slowapi==0.1.9
+
 # Environment
 python-dotenv==1.0.1
 
 # Report generation
 reportlab==4.2.0
 lxml==5.2.2
-openpyxl==3.1.2
+
+# Google Drive
+google-api-python-client==2.131.0
+google-auth==2.29.0
 
 # Testing
 pytest==8.2.0

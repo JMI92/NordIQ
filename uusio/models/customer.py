@@ -20,6 +20,7 @@ class Customer(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     country_of_incorporation: Mapped[str] = mapped_column(String(2), nullable=False)
     contact_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    drive_folder_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     users: Mapped[list["User"]] = relationship("User", back_populates="customer", cascade="all, delete-orphan")  # type: ignore[name-defined]
     data_sources: Mapped[list["CustomerDataSource"]] = relationship("CustomerDataSource", back_populates="customer", cascade="all, delete-orphan")
