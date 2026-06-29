@@ -1,5 +1,6 @@
 """Admin-only endpoints: organization management, pro-contracts, platform stats."""
 
+import logging
 import secrets
 import string
 import uuid
@@ -13,6 +14,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uusio.api.dependencies import get_current_user, get_db
 from uusio.core.database import get_db
 from uusio.core.security import hash_password
+from uusio.services.google_drive import create_customer_folder
+
+logger = logging.getLogger(__name__)
+
 from uusio.models.customer import Customer
 from uusio.models.obligation import EPRObligation, ReportingDeadline
 from uusio.models.pro_registry import CustomerPRORegistration, PROOrganisation
@@ -131,6 +136,19 @@ async def create_organization(body: OrgCreate, admin: AdminUser, db: Annotated[A
     db.add(customer)
     await db.commit()
     await db.refresh(customer)
+
+    # Create Google Drive folder for the customer (non-blocking — failure doesn't abort)
+    try:
+        folder_id = await create_customer_folder(customer.name)
+        if folder_id:
+            customer.drive_folder_id = folder_id
+            await db.commit()
+            logger.info("Drive folder created for customer %s: %s", customer.id, folder_id)
+        else:
+            logger.warning("Drive folder not created for customer %s (Drive not configured?)", customer.id)
+    except Exception:
+        logger.exception("Unexpected error creating Drive folder for customer %s", customer.id)
+
     return _org_out(customer)
 
 
