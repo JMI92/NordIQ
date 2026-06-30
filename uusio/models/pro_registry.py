@@ -1,9 +1,9 @@
 """PRO (Producer Responsibility Organisation) registry and customer registrations."""
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, ForeignKey, String, Text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -86,3 +86,35 @@ class CustomerPRORegistration(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     def __repr__(self) -> str:
         return f"<CustomerPRORegistration customer={self.customer_id} pro={self.pro_id} [{self.status}]>"
+
+
+class PROPortalCredential(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Login credentials for a customer's account on a PRO's web portal.
+
+    One row per CustomerPRORegistration that uses submission_method == "portal".
+    The password is encrypted with the app Fernet key (uusio.core.security
+    encrypt_config/decrypt_config), the same pattern already used for
+    PROOrganisation.submission_api_key_encrypted.
+    """
+
+    __tablename__ = "pro_portal_credentials"
+
+    customer_pro_registration_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("customer_pro_registrations.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    portal_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    username: Mapped[str] = mapped_column(String(255), nullable=False)
+    password_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
+    # active / invalid / locked — set to "invalid" automatically when login fails
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
+    last_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    registration: Mapped["CustomerPRORegistration"] = relationship("CustomerPRORegistration")
+
+    def __repr__(self) -> str:
+        return f"<PROPortalCredential registration={self.customer_pro_registration_id} [{self.status}]>"
