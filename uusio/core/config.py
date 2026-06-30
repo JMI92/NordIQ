@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     use_s3: bool = False
     use_ses: bool = False
     ses_from: str = ""    # SES verified sender; falls back to smtp_from if empty
+    admin_alert_email: str = ""  # where portal-automation failure alerts are sent
 
     # Storage
     report_storage_path: str = "./reports"
