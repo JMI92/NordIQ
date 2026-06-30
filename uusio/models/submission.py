@@ -2,7 +2,7 @@
 
 import uuid
 
-from sqlalchemy import ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -23,6 +23,10 @@ class PROSubmission(UUIDPrimaryKeyMixin, CustomerScopedMixin, TimestampMixin, Ba
     response_payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # S3 key of a screenshot taken at the point of failure (portal automation debug evidence)
+    screenshot_s3_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Set once retries are exhausted so admins can filter without scanning every FAILED row
+    needs_attention: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     obligation: Mapped["EPRObligation"] = relationship("EPRObligation", back_populates="submissions")  # type: ignore[name-defined]
     customer: Mapped["Customer"] = relationship("Customer")  # type: ignore[name-defined]
